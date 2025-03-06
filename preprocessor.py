@@ -13,17 +13,17 @@ from utilities import get_data_frame
 path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
 
 directory_names = [
-    "3d/please-work/physics/linearimplicit/dt1e-3/",
-    "3d/please-work/physics/linearimplicit/dt5e-4/",
-    "3d/please-work/physics/linearimplicit/dt2e-4/",
-    "3d/please-work/physics/linearimplicit/dt1e-4/",
+    # "3d/please-work/physics/linearimplicit/dt1e-3/",
+    # "3d/please-work/physics/linearimplicit/dt5e-4/",
+    # "3d/please-work/physics/linearimplicit/dt2e-4/",
+    # "3d/please-work/physics/linearimplicit/dt1e-4/",
     # "3d/please-work/physics/linearimplicit/dt5e-5/",
     # "3d/please-work/physics/linearimplicit/dt1e-5/",
-    # "3d/please-work/physics/semi/dt1e-5/",
-    "3d/please-work/physics/substepping/dt2e-4/",
-    "3d/please-work/physics/substepping/dt1e-4/",
-    "3d/please-work/physics/substepping/dt5e-5/",
-    "3d/please-work/physics/substepping/dt1e-5/",
+    "3d/please-work/physics/semiimplicit/dt1e-5/",
+    # "3d/please-work/physics/substepping/dt2e-4/",
+    # "3d/please-work/physics/substepping/dt1e-4/",
+    # "3d/please-work/physics/substepping/dt5e-5/",
+    # "3d/please-work/physics/substepping/dt1e-5/",
     ]
 
 # path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/cylinder/2d/hx1/physics/"
@@ -39,40 +39,88 @@ directory_names = [
 
 
 def adjust_info_length(iter_info, step_info, cfl_info):
+    # Check length for each info to find IO_INFOSTEPS and IO_CFLSTEPS
+    # Note that len(iter) (iteration info) is always equal to number of time steps
     len_iter = len(iter_info[0])
     len_step = len(step_info[0])
     len_cfl = len(cfl_info[0])
     len_max = max(len_iter, len_step, len_cfl)
-    print(f"Longest list: {len_max}")
 
-    # Adjust len_step
+    io_infosteps = int(len_iter / len_step)
+    io_cflsteps =  int(len_iter / len_cfl)
+    print(f"Longest list: {len_max}, io_infosteps = {io_infosteps}, io_cflsteps = {io_cflsteps}")
+
+    # Adjust step_info
+    # Fill unknown steps and phys_time correctly, fill unknown CPU time with nan
+    new_step_info = []
     if len_step != len_max:
         print("Adjusting size of step_info")
-        # Set step to nan
+        # Set step to continuous number
+        # and phys_time and cpu_time to nan
         if len_step == 0:
-            step_info = [
-                [np.nan for i in range(len_max)],
-                [np.nan for i in range(len_max)],
+            new_step_info.append(
+                [i for i in range(len_max)]
+            )
+            new_step_info.append(
                 [np.nan for i in range(len_max)]
-            ]
+            )
+            new_step_info.append(
+                [np.nan for i in range(len_max)]
+            )
+        # Set steps to continuous number
+        # Derive phystime from available step info
+        # Set CPU time to nan everywhere except for the known info
+        # Another option would be to set an average of the CPU time for n_steps, but I prefer to keep "raw" data
+        else:
+            # Updated steps
+            new_step_info.append(
+                [i for i in range(len_max)]
+            )
+
+            # Updated phys_time
+            dt = (step_info[1][1] - step_info[1][0]) / (io_infosteps)
+            initial_phys_time = step_info[1][0] - io_infosteps * dt
+            print(f"dt = {dt}, initial_phys_time = {initial_phys_time}")
+            new_step_info.append(
+                [initial_phys_time + i * dt for i in range(len_max)]
+            )
+
+            # Updated cpu time
+            cpu_time = np.full(len_max, np.nan)
+            cpu_time[::io_infosteps] = step_info[2]
+            new_step_info.append(cpu_time)
+
+    # If nothing to do, return the input
+    else:
+        new_step_info = step_info
 
     # Adjust len_cfl
+    new_cfl_info = []
     if len_cfl != len_max:
         print("Adjusting size of cfl_info")
-        # Set CFL to nan
+        # Set CFL and CFL element to nan
         if len_cfl == 0:
             cfl_info = [
                 [np.nan for i in range(len_max)],
                 [np.nan for i in range(len_max)]
             ]
-        # # TODO Adjust size of CFL list
-        # else:
-        #     ratio = len_max / len_cfl
-        #     cfl_info[0] = np.array(cfl_info),
-        #         np.zeros_like(iter_info[0])
-        #     ]
+        # Set unknown CFL and CFL element to nan
+        else:
+            # Updated cfl
+            cfl = np.full(len_max, np.nan)
+            cfl[::io_cflsteps] = cfl_info[0]
+            new_cfl_info.append(cfl)
 
-    return iter_info, step_info, cfl_info
+            # Updated cfl element
+            cfl_element = np.full(len_max, np.nan)
+            cfl_element[::io_cflsteps] = cfl_info[1]
+            new_cfl_info.append(cfl_element)
+
+    # If nothing to do, return the input
+    else:
+        new_cfl_info = cfl_info
+
+    return new_step_info, new_cfl_info
 
 def parse_meta_data(logfile):
     meta_dict = {}
@@ -87,6 +135,8 @@ def parse_meta_data(logfile):
     steps_found = 0
     nsteps_prev = 0
     step_break = False
+
+    cfl_info_pattern = r"IO_CFLSTEPS = (\d+)"
     # cfl_pattern = r"CFL:\s*([\d.e+-]+)\s*\(in\s*elmt\s*(\d+)\)"
 
     with open(logfile, 'r') as f:
@@ -122,10 +172,11 @@ def parse_meta_data(logfile):
                     meta_dict['step_info_steps'] = int(nsteps) - int(nsteps_prev)
                     step_break = True
 
-            # # Get number of steps between CFL info
-            # # CFL does not tell step in line (either check previous/next line or do not check at all)
-            # if 'CFL:' in line and 'in elmt' in line:
-            #     meta_dict['cfl_info_steps'] = 1
+            # Get number of steps between CFL info
+            # CFL does not tell step in line (either check previous/next line or do not check at all)
+            if 'IO_CFLSTEPS' in line:
+                fields = re.search(cfl_info_pattern, line.strip())
+                meta_dict['cfl_info_steps'] = fields.group(1)
 
             # Break meta data scan
             if step_break:
@@ -201,7 +252,7 @@ def parse_log_file(logfile):
 
     # Adjust length for equal length lists
     if len(step_info[0]) != len(iter_info[0]) or len(step_info[0]) != len(cfl_info[0]):
-        iter_info, step_info, cfl_info = adjust_info_length(iter_info, step_info, cfl_info)
+        step_info, cfl_info = adjust_info_length(iter_info, step_info, cfl_info)
 
 
     # Create data frame from lists
@@ -237,7 +288,7 @@ def test_parse_log_file():
 if __name__ == "__main__":
     # Walk through directories and merge files
     file_glob_strs = [
-        'log.l*',
+        'log*',
         'FWING_TOTAL_forces.fce',
         'LFW_fia_mp_forces.fce',
         'LFW_element_1_forces.fce',
@@ -267,6 +318,7 @@ if __name__ == "__main__":
 
             # Loop through all subdirectories, read files and merge all data
             for subdir in subdirs:
+                print(f"\tProcessing sub-directory {subdir}")
                 # Skip any non-ctu directories
                 cdpath = subdir + "/"
                 # print(f"\t\tcdpath: {cdpath}")
@@ -274,10 +326,10 @@ if __name__ == "__main__":
                 # Find log file(s) in sub-directory
                 files = glob(cdpath + file_glob_str)
                 if len(files) == 0:
-                    print(f"WARNING. Could not find any files using glob string: {file_glob_str}")
+                    print(f"WARNING. Could not find any files using glob string: {file_glob_str} on path: {cdpath}")
                     continue
                 if len(files) > 1:
-                    print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]}")
+                    print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]} on path: {cdpath}")
                     process_file = files[0]
                 else:
                     process_file = files[0]
@@ -286,7 +338,7 @@ if __name__ == "__main__":
                 if 'log' in file_glob_str:
                     df_file = parse_log_file(process_file)
                 elif 'fce' in file_glob_str:
-                    df_file = get_data_frame(process_file, skip_start = 0, skip_end = 0)
+                    df_file = get_data_frame(process_file, skip_start = 5, skip_end = 0)
 
                 # Copy initial dataframe or concatenate parsed logs
                 if df_full.empty:
@@ -301,14 +353,19 @@ if __name__ == "__main__":
             if 'log' in file_glob_str:
                 df_full.to_csv(full_directory_path + "log_info.csv", index=False)
             else:
-                df_full.to_csv(full_directory_path + file_glob_str, index=False)
+                df_full.to_csv(full_directory_path + file_glob_str.replace(".fce", "-process.fce"), index=False)
 
             # Debug print/plot
-            print(df_full)
-            # df_full.plot()
+            # print(df_full)
+            if "TOTAL" in file_glob_str:
+                df_full.plot(x='Time', y='F3-total', label=dname)
+            if "log" in file_glob_str:
+                df_full.plot(y='phys_time', label=dname)
 
             # Clear memory
             del df_full
             del df_file
 
+    # Debug print/plot
+    plt.legend()
     plt.show()
