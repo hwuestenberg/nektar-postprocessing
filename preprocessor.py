@@ -8,34 +8,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end
 from utilities import get_data_frame
 
-path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
-
-directory_names = [
-    # "3d/please-work/physics/linearimplicit/dt1e-3/",
-    # "3d/please-work/physics/linearimplicit/dt5e-4/",
-    # "3d/please-work/physics/linearimplicit/dt2e-4/",
-    # "3d/please-work/physics/linearimplicit/dt1e-4/",
-    # "3d/please-work/physics/linearimplicit/dt5e-5/",
-    # "3d/please-work/physics/linearimplicit/dt1e-5/",
-    "3d/please-work/physics/semiimplicit/dt1e-5/",
-    # "3d/please-work/physics/substepping/dt2e-4/",
-    # "3d/please-work/physics/substepping/dt1e-4/",
-    # "3d/please-work/physics/substepping/dt5e-5/",
-    # "3d/please-work/physics/substepping/dt1e-5/",
-    ]
-
-# path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/cylinder/2d/hx1/physics/"
-#
-# directory_names = [
-#         "VCSImplicit/Extrapolated/IMEXOrder1/equal-order/dt1e-3/",
-#         ]
-
-# path_to_directories = "/home/henrik/Documents/simulation_data/"
-# directory_names = [
-#     "test_files/"
-# ]
 
 
 def adjust_info_length(iter_info, step_info, cfl_info):
@@ -121,6 +96,7 @@ def adjust_info_length(iter_info, step_info, cfl_info):
         new_cfl_info = cfl_info
 
     return new_step_info, new_cfl_info
+
 
 def parse_meta_data(logfile):
     meta_dict = {}
@@ -284,6 +260,7 @@ def test_parse_log_file():
         print('Meta info:', i, type(i), len(df_log[i]))
 
 
+# TODO extend this for History point files (justify time-averaging windows)
 # TODO extend this for Energy (3D) files
 if __name__ == "__main__":
     # Walk through directories and merge files
@@ -298,14 +275,14 @@ if __name__ == "__main__":
     # Loop all possible files (logs, force, ..)
     for file_glob_str in file_glob_strs:
         # Loop all directories (cases)
-        for dname in directory_names:
+        for directory_name in directory_names:
             # Create empty dataframe for this file(-type)
             df_full = pd.DataFrame()
             df_file = pd.DataFrame()
 
             # Verbose print
-            print(f"Processing directory {dname}")
-            full_directory_path = path_to_directories + dname
+            print(f"Processing directory {directory_name}")
+            full_directory_path = path_to_directories + directory_name
 
             # Find and sort all available subdirs following the naming convention ctu_start_end where start and end are integers
             subdirs = [f.path for f in os.scandir(full_directory_path) if f.is_dir() and 'ctu' in f.name]
@@ -338,7 +315,7 @@ if __name__ == "__main__":
                 if 'log' in file_glob_str:
                     df_file = parse_log_file(process_file)
                 elif 'fce' in file_glob_str:
-                    df_file = get_data_frame(process_file, skip_start = 5, skip_end = 0)
+                    df_file = get_data_frame(process_file, skip_start = force_file_skip_start, skip_end = force_file_skip_end)
 
                 # Copy initial dataframe or concatenate parsed logs
                 if df_full.empty:
@@ -353,14 +330,14 @@ if __name__ == "__main__":
             if 'log' in file_glob_str:
                 df_full.to_csv(full_directory_path + "log_info.csv", index=False)
             else:
-                df_full.to_csv(full_directory_path + file_glob_str.replace(".fce", "-process.fce"), index=False)
+                df_full.to_csv(full_directory_path + file_glob_str.replace(".", "-process."), index=False)
 
             # Debug print/plot
             # print(df_full)
             if "TOTAL" in file_glob_str:
-                df_full.plot(x='Time', y='F3-total', label=dname)
+                df_full.plot(x='Time', y='F3-total', label=directory_name)
             if "log" in file_glob_str:
-                df_full.plot(y='phys_time', label=dname)
+                df_full.plot(y='phys_time', label=directory_name)
 
             # Clear memory
             del df_full

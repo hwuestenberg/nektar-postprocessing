@@ -2,16 +2,13 @@
 import os, sys, subprocess, glob
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 
 # Import for charles plots
 # from CharLESForces import *
 # from compareForcesCharLES import *
 
-
-# Problem specific parameters
-CTUlen = 1.0
-dtref = 1e-5 # Reference time step for CFL \approx 1
-dtol = 1e+1 # Divergence tolerance
+from config import ctu_len, dtref
 
 
 
@@ -42,11 +39,11 @@ def get_data_frame(filename, skip_start = 0, skip_end = 0):
 
 def get_time_step_size(directory_name):
     # Read cputime.dat
-    dftime = pd.read_csv(directory_name + "cputime.dat", sep=" ")
+    dftime = pd.read_csv(directory_name + "log_info.csv", sep=",")
 
     # Get time/step info for x-axis
-    phystime = dftime["phystime"].to_numpy()
-    steps = dftime["step"].to_numpy()
+    phystime = dftime["phys_time"].to_numpy()
+    steps = dftime["steps"].to_numpy()
     dt = (phystime[1] - phystime[0]) / (steps[1] - steps[0]) # Get time step size
     return dt
 
@@ -155,6 +152,54 @@ def mse(df_force):
     print('The minimum MSE is: ', minMSE)
     print('The final sample number to achive min(MSE) is: ', index_minMSE)
     print('Time-averaging can start from T : ', content[index_minMSE, 0], 'CTUs')
+
+
+
+"""
+    Marginal Standard Error Rule (mser)
+
+    Estimate the end of the transient based on the minimum mean squared error 
+    (mse) of the signal's mean with varying truncation.
+
+    @param dataframe Dataframe containing the signal to analyse for transient 
+    influence.
+    @param signalKey Key for the dataframe's column.
+
+
+"""
+def mser(dataframe, signalKey='signal', timeKey='Time', debug_plot = False):
+    # Determine truncation range
+    # i.e. range in which we expect the transient to be
+    npoints = dataframe.shape[0]
+    truncationRange = int(npoints / 2) # For simplicity, we choose half of all data
+    print("npoints {0}, truncRange 0 to {1}".format(npoints, truncationRange))
+
+    # Choose stride length (accuracy vs efficiency)
+    stride_length = 1 if npoints < 1e4 else 10
+
+    # Save mean-squared-error sums for each truncation
+    sums = list()
+
+    # Loop with increasing truncation
+    for d in range(0, truncationRange, stride_length):
+        # Extract truncated signal
+        truncSignal = dataframe[signalKey].iloc[d:]
+
+        # Determine mean-squared-error against truncated mean
+        sums.append(
+                ((truncSignal - truncSignal.mean()) ** 2).mean() / (npoints - d)
+                )
+
+    # DEBUG plot truncated mse
+    if debug_plot:
+        fig = plt.figure(figsize=(8,4))
+        ax = fig.add_subplot(111)
+        ax.plot(dataframe[timeKey].iloc[:truncationRange:stride_length] / ctu_len, sums, label=signalKey)
+
+    # Multiply by stride length to account for lower resolution
+    dstar = np.argmin(sums) * stride_length
+    return dstar
+
 
 
 def plot_charles_results():
