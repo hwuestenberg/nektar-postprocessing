@@ -8,8 +8,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end
+from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, DEBUG
 from utilities import get_data_frame
+
 
 
 
@@ -330,14 +331,18 @@ if __name__ == "__main__":
             if 'log' in file_glob_str:
                 df_full.to_csv(full_directory_path + "log_info.csv", index=False)
             else:
-                df_full.to_csv(full_directory_path + file_glob_str.replace(".", "-process."), index=False)
+                savename = file_glob_str.replace(".", "-process.")
+                if force_file_skip_start != -1:
+                    savename = savename.replace("-process.", f"-process-overlap-{force_file_skip_start}.")
+                df_full.to_csv(full_directory_path + savename, index=False)
 
             # Debug print/plot
-            # print(df_full)
-            if "TOTAL" in file_glob_str:
-                df_full.plot(x='Time', y='F3-total', label=directory_name)
-            if "log" in file_glob_str:
-                df_full.plot(y='phys_time', label=directory_name)
+            if DEBUG:
+                # print(df_full)
+                if "TOTAL" in file_glob_str:
+                    df_full.plot(x='Time', y='F3-total', label=directory_name)
+                if "log" in file_glob_str:
+                    df_full.plot(y='phys_time', label=directory_name)
 
             # Clear memory
             del df_full

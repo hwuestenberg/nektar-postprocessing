@@ -1,6 +1,8 @@
 
 
 #### CONFIG FOR 3D extruded IFW ####
+DEBUG = True
+
 path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
 
 directory_names = [
