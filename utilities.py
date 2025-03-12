@@ -187,7 +187,7 @@ def mser(dataframe, signalKey='signal', timeKey='Time', debug_plot = False):
 
         # Determine mean-squared-error against truncated mean
         sums.append(
-                ((truncSignal - truncSignal.mean()) ** 2).mean() / (npoints - d)
+                ((truncSignal - truncSignal.mean()) ** 2).sum() / (npoints - d) ** 2
                 )
 
     # DEBUG plot truncated mse
