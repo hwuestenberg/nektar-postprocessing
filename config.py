@@ -41,6 +41,23 @@ ref_area = ctu_len * spanlen_npp # reference area
 # reference time step size (CFL ~= 1)
 dtref = 1e-5
 
+# Choose inidividual file names for averages
+ctu_names = [
+    "ctu_204_242",
+    "ctu_204_268",
+    "ctu_204_287",
+]
+
+# Boundary data naming:
+# b0 : main plane
+# b1 : 1st flap
+# b2 : 2nd flap
+boundary_names = [
+    "b0",
+    "b1",
+    "b2",
+]
+
 
 
 #### CONFIG FOR 2D cylinder ####
