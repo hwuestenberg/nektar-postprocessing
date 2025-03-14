@@ -1,5 +1,7 @@
 #!/bin/python3
 
+import os
+
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
 params = {'text.usetex': True,
@@ -10,7 +12,9 @@ from matplotlib.colors import TABLEAU_COLORS
 
 import numpy as np
 import pandas as pd
-import os
+
+from scipy.interpolate import griddata
+import alphashape
 
 from utilities import get_time_step_size
 from config import directory_names, path_to_directories, dtref, ctu_len, ctu_names, boundary_names
@@ -18,7 +22,7 @@ from config import directory_names, path_to_directories, dtref, ctu_len, ctu_nam
 # Parse command line arguments
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument(                                    
+parser.add_argument(
     "variable", help="Choose either cp or cf", type=str, default='cf', nargs='?')
 args = parser.parse_args()                              
 
@@ -59,14 +63,13 @@ def get_label(full_file_path, dt):
         label += " sub-stepping"
     elif "quasi3d" in full_file_path:
         label += " Slaughter et al. (2023)"
-        mfc='None'
-        marker='o'
+        color = 'black'
 
     return label, marker, mfc
 
 
 if __name__ == "__main__":
-    fig = plt.figure(figsize=(8,4))
+    fig = plt.figure(figsize=(9,4))
     ax = fig.add_subplot(111)
 
     # Loop all files

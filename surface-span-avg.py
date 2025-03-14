@@ -1,92 +1,45 @@
-#!/usr/bin/env  python3
+#!/bin/python3
 
-# from CharLESProbes import *
-# from compareProbesCharLES import *
+import os, glob, subprocess
 
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
-#plt.rcParams['text.latex.preamble']=[r"%\usepackage{newtxtext}"]
+
+
 params = {'text.usetex': True,
  'font.size' : 10,
-# 'font.serif': ['Times New Roman'],
-# 'font.family': 'serif'
 }
 plt.rcParams.update(params) 
 from matplotlib.colors import TABLEAU_COLORS
 
 import numpy as np
 import pandas as pd
-import os, sys, glob, subprocess
 
 from scipy.interpolate import griddata
 import alphashape
 
-import argparse
+from utilities import get_time_step_size
+from config import directory_names, path_to_directories, dtref, ctu_len, ctu_names, boundary_names
 
-# Parse command line arguments                          
-parser = argparse.ArgumentParser()                      
-parser.add_argument(                                    
+# Parse command line arguments
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument(
     "variable", help="Choose either cp or cf", type=str, default='cf', nargs='?')
 args = parser.parse_args()                              
 
 
-CTUlen = 0.25 # main plane chord
-spanlenNpp = 0.05 # span-wise domain size
-
-dtref = 1e-5 # Refernce time step for CFL \approx 1
-
-#savename = "eifw-" + args.variable + "-refine"
-#savename = "eifw-" + args.variable + "-dt-influence"
-#savename = "eifw-" + args.variable + "-vs-james"
-# savename = "eifw-" + args.variable + "-substepping"
 
 savename = ""
-dirnames = [
-        #"3d/5bl/physics/semidt1e-5/means/",
-        #"3d/8bl/physics/semidt1e-5/means/",
-        #"3d/refined/physics/semidt1e-5/means/",
-        "3d/please-work/physics/semiimplicit/dt1e-5/means/",
-        # "3d/please-work/physics/implicitdt5e-5/means/",
-        # "3d/please-work/physics/substepping/dt5e-5/means/",
-        #"3d/please-work/physics/implicitdt1e-4/means/",
-        #"3d/please-work/physics/implicitdt5e-4/means/",
-        #"3d/please-work/physics/implicitdt1e-3/means/",
-        #"quasi3d/james/farringdon_data/Cf/",
-        ]
 
-#ctuname = "ctu_20_30"
-#ctuname = "ctu_15_20"
-ctuname = "ctu_1746_2146"
-ctuname2 = "ctu_172_223"
-ctuname3 = "ctu_160_182"
-
+# Set variable extension for the respective average files
+# Pressure data: no specific extensions
+# Skin friction: use wss (wall shear stress) extension
+var_extension = ''
 if args.variable == "cf":
-    fnames = [
-            "mean_fields_" + ctuname + "_avg_wss_b0.csv",
-            "mean_fields_" + ctuname + "_avg_wss_b1.csv",
-            "mean_fields_" + ctuname + "_avg_wss_b2.csv",
-            "mean_fields_" + ctuname2+ "_avg_wss_b0.csv",
-            "mean_fields_" + ctuname2+ "_avg_wss_b1.csv",
-            "mean_fields_" + ctuname2+ "_avg_wss_b2.csv",
-            "mean_fields_" + ctuname3+ "_avg_wss_b0.csv",
-            "mean_fields_" + ctuname3+ "_avg_wss_b1.csv",
-            "mean_fields_" + ctuname3+ "_avg_wss_b2.csv",
-            ]
-else:
-    if "quasi3d" in dirnames[-1]:
-        dirnames[-1] = "quasi3d/james/farringdon_data/CP/"
-    fnames = [
-            "mean_fields_" + ctuname + "_avg_b0.csv",
-            "mean_fields_" + ctuname + "_avg_b1.csv",
-            "mean_fields_" + ctuname + "_avg_b2.csv",
-            "mean_fields_" + ctuname2+ "_avg_b0.csv",
-            "mean_fields_" + ctuname2+ "_avg_b1.csv",
-            "mean_fields_" + ctuname2+ "_avg_b2.csv",
-            "mean_fields_" + ctuname3+ "_avg_b0.csv",
-            "mean_fields_" + ctuname3+ "_avg_b1.csv",
-            "mean_fields_" + ctuname3+ "_avg_b2.csv",
-            ]
+    var_extension = 'wss_'
 
+wss_variable = 'Shear_mag'
 
 
 # Build concave hull of the original geometry 
@@ -124,16 +77,81 @@ def getSampleCoordinatesOnGeometry(x_slice_coords, z_slice_coords):
     return x, z
 
 
+def create_slices(full_file_path):
+    # Find all slices and sort by increasing location
+    slicenames = glob.glob(full_file_path.replace(".csv", "") + '-slicey*.csv')
+    slicenames = sorted(slicenames)
+    nslices = len(slicenames)
+
+    # Call slicer if no slices found
+    if nslices == 0:
+        print("Calling slicer.py")
+        paraviewPath = "/home/henrik/sw/ParaView-5.11.2-MPI-Linux-Python3.9-x86_64/bin/pvbatch "
+        slicerPath = "/home/henrik/Documents/simulation_data/postprocess/slicer.py "
+        slicerArgs = "--in_file " + full_file_path.replace(".csv", ".vtu")
+        cmdSlice = paraviewPath + slicerPath + slicerArgs
+        msg = subprocess.check_output(cmdSlice, shell=True)
+
+        # Again search for slices
+        slicenames = glob.glob(full_file_path.replace(".csv", "") + '-slicey*.csv')
+        slicenames = sorted(slicenames)
+        nslices = len(slicenames)
+
+    # Read paraview-type csv file with coordinates x,y,z = Points:0,1,2
+    dfslice = pd.read_csv(slicenames[0])
+    x_slice_coords = dfslice.iloc[:, 4]
+    y_slice_coords = dfslice.iloc[:, 5]
+    z_slice_coords = dfslice.iloc[:, 6]
+
+    return slicenames, x_slice_coords, z_slice_coords
 
 
+def interpolate_and_average_slices(slicenames):
+    # Process all slices and compute mean at interpolated coordinate
+    sq_mean = 0
+    for sname in slicenames:
+        df = pd.read_csv(sname)
 
-def getlabel(casestr, color, dt):
+        # Process surface quantity
+        if args.variable == "cf":
+            datastr = wss_variable
+        elif args.variable == "cp":
+            datastr = "p"
+        else:
+            print(f"ERROR. Cannot interpret command line argument for args.variable: {args.variable}. Exiting.")
+            exit()
+        sq = df[datastr]
+        sq = 2 * sq  # Normalise against dynamic pressure
+
+        # Extract x, y, z coordinates
+        # Check for paraview or nektar input csv
+        if 'Points:0' in df.columns:
+            x_coords = df.iloc[:, 4]
+            y_coords = df.iloc[:, 5]
+            z_coords = df.iloc[:, 6]
+        elif 'x' in df.columns or 'y' in df.columns:
+            x_coords = df.iloc[:, 0]
+            y_coords = df.iloc[:, 1]
+            z_coords = df.iloc[:, 2]
+        else:
+            print(f"ERROR. Cannot find x/y/z coordinates in dataframe df with columns: {df.columns}. Exiting")
+            exit()
+
+        # Method = 'Nearest' gives the best result
+        # that is one point for each input coordinate
+        # linear and cubic would only give a few points on suction side (interpolation error?)
+        sq_interp = griddata((x_coords, z_coords), sq, (sampled_x, sampled_z), method='nearest')
+
+        sq_mean += sq_interp
+
+    return sq_mean
+
+
+def get_label(full_file_path, dt):
     # Build case specific label for plots
     label = ""
     marker = "."
     mfc='None'
-    ls='solid'
-    color = color
 
     # Add time step size
     if dt < dtref:
@@ -144,190 +162,140 @@ def getlabel(casestr, color, dt):
         label += "${0:d}$".format(
                 int(round(dt/dtref))
                 )
-    label += "$ \Delta t_{CFL}$"
+    label += r"$ \Delta t_{CFL}$"
 
-    if "implicit" in casestr:
-        label += " implicit"
-    elif "semi" in casestr:
+    if "linear" in full_file_path:
+        label += " linear-implicit"
+    elif "semi" in full_file_path:
         label += " semi-implicit"
-    elif "substepping" in casestr:
-        label += " substepping"
-    elif "quasi3d" in casestr:
+    elif "substepping" in full_file_path:
+        label += " sub-stepping"
+    elif "quasi3d" in full_file_path:
         label += " Slaughter et al. (2023)"
         color = 'black'
 
-    if "5bl" in casestr:
+    if "5bl" in full_file_path:
         label += " Mesh A"
-    elif "8bl" in casestr:
+    elif "8bl" in full_file_path:
         label += " Mesh B"
-    elif "refined" in casestr:
+    elif "refined" in full_file_path:
         label += " Mesh C"
-    elif "please-work" in casestr:
+    elif "please-work" in full_file_path:
         label += " Mesh D"
 
-    return label, marker, mfc, ls, color
-
-
-
-def getTimeStepSize(path):
-    # Read cputime.dat
-    dftime = pd.read_csv(path + "cputime.dat", sep=" ")
-
-    # Get time/step info for x-axis
-    phystime = dftime["phystime"].to_numpy()
-    steps = dftime["step"].to_numpy()
-    dt = (phystime[1] - phystime[0]) / (steps[1] - steps[0]) # Get time step size
-    return dt
-
-
+    return label, marker, mfc
 
 
 if __name__ == "__main__":
     fig = plt.figure(figsize=(9,4))
     ax = fig.add_subplot(111)
 
-    # Loop all directories (cases) and files
-    for dname, color in zip(dirnames, TABLEAU_COLORS):
+    # Loop all files
+    for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
+        # Setup paths
+        full_directory_path = path_to_directories + dirname
+
+        # Reset x-origin to zero before all three wings are being processed
         xorigin = 0
-        for fname in fnames:
-            nslices = 0
-            if not os.path.exists(dname + fname):
-                print("Did not find {0}".format(dname + fname))
-                continue
 
-            # Define case name
-            if "quasi3d" in dname:
-                dt = 4e-6
-            else:
-                dt = getTimeStepSize(dname)
-            label, marker, mfc, ls, color = getlabel(dname, color, dt)
-            print("Processing {0}...".format(label))
+        # Loop all files (this loops different ctu names and wing elements)
+        # for filename, file_color in zip(filenames, TABLEAU_COLORS):
+        for ctuname, ctu_color in zip(ctu_names, TABLEAU_COLORS):
+            for bname, b_color in zip(boundary_names, TABLEAU_COLORS):
+                filename = "means/mean_fields_" + ctuname + "_avg_" + var_extension + bname + ".csv"
+                full_file_path = full_directory_path + filename
+                if not os.path.exists(full_file_path):
+                    print("Did not find {0}".format(full_file_path))
+                    continue
 
-            # Process surface quantity
-            if "quasi3d" in dname:
-                df = pd.read_csv(dname + fname)
-                x = df["x"] / CTUlen
-                sq = df[args.variable]
-            else:
-                # Find all slices and sort by increasing location
-                slicenames = glob.glob(dname + fname.replace(".csv","") + '-slicey*.csv')
-                slicenames = sorted(slicenames)
-                nslices = len(slicenames)
+                # Define case name
+                if "quasi3d" in full_directory_path:
+                    dt = 4e-6
+                else:
+                    dt = get_time_step_size(full_directory_path)
 
-                # Call slicer
-                if nslices == 0:
-                    print("Calling slicer.py")
-                    paraviewPath = "/home/henrik/Downloads/ParaView-5.11.0-MPI-Linux-Python3.9-x86_64/bin/pvbatch "
-                    slicerPath = "/home/henrik/Documents/00_phd/03_project/simulations/codeVerification/f1-ifw/eifw/3d/slicer.py "
-                    slicerArgs = "--in_file " + dname + fname.replace(".csv",".vtu")
-                    cmdSlice = paraviewPath + slicerPath + slicerArgs
-                    msg = subprocess.check_output(cmdSlice, shell=True)
+                # Get plot styling
+                label, marker, mfc = get_label(full_file_path, dt)
+                print("\nProcessing {0}...".format(label))
 
-                    # Re-do finding slices
-                    slicenames = glob.glob(dname + fname.replace(".csv","") + '-slicey*.csv')
-                    slicenames = sorted(slicenames)
+                # Process surface quantity
+                if "quasi3d" in full_directory_path:
+                    df = pd.read_csv(full_file_path)
+                    x = df["x"] / ctu_len
+                    sq = df[args.variable]
+                else:
+                    slicenames, x_slice_coords, z_slice_coords = create_slices(full_file_path)
                     nslices = len(slicenames)
 
-                dfslice = pd.read_csv(slicenames[0])
-                if 'Points:0' in dfslice.columns:
-                    x_slice_coords = dfslice.iloc[:, 4]
-                    y_slice_coords = dfslice.iloc[:, 5]
-                    z_slice_coords = dfslice.iloc[:, 6]
+                    # Sample x and z points on the geometry
+                    sampled_x, sampled_z = getSampleCoordinatesOnGeometry(x_slice_coords, z_slice_coords)
 
-                # Sample x and z points on the geometry
-                sampled_x, sampled_z = getSampleCoordinatesOnGeometry(x_slice_coords, z_slice_coords)
+                    sq_mean = interpolate_and_average_slices(slicenames)
+                    sq = sq_mean / nslices
+                    x = np.array(sampled_x) / ctu_len
 
-                # Process all slices and compute mean at interpolated coordinate
-                sqmean = 0
-                for sname in slicenames:
-                    df = pd.read_csv(sname)
+                # Shift x to zero, if necessary
+                if xorigin == 0:
+                    xorigin = np.min(x)
+                x = x - xorigin # Set origin to zero
+                # print("xorigin:", xorigin)
 
-                    # Process surface quantity
-                    if args.variable == "cf":
-                        datastr = "Shear_mag"
-                    elif args.variable == "cp":
-                        datastr = "p"
-                    data = df[datastr]
-                    sq = 2 * data # Normalise against dynamic pressure
+                # Create label for only one of the wings
+                if bname != boundary_names[0]:
+                   label = ""
+                else:
+                   label += f" {ctuname}"
 
-                    # Extract x, y, z coordinates
-                    # Check for paraview or nektar input csv
-                    if 'Points:0' in df.columns:
-                        x_coords = df.iloc[:, 4]
-                        y_coords = df.iloc[:, 5]
-                        z_coords = df.iloc[:, 6]
-                    elif 'x' in df.columns or 'y' in df.columns:
-                        x_coords = df.iloc[:, 0]
-                        y_coords = df.iloc[:, 1]
-                        z_coords = df.iloc[:, 2]
+                # Plot data
+                ax.plot(x, sq, marker=marker, linestyle='', markeredgewidth=1.5, color=ctu_color, label=label, markerfacecolor=mfc)#, alpha=0.8)
 
-                    # Method = 'Nearest' gives the best result
-                    # that is one point for each input coordinate
-                    # linear and cubic would only give a few points on suction side (interpolation error?)
-                    sq_interp = griddata((x_coords, z_coords), sq, (sampled_x, sampled_z), method='nearest')
-
-                    sqmean += sq_interp
-                sq = sqmean / nslices
-                x = np.array(sampled_x) / CTUlen
-
-            # Shift x to zero, if necessary
-            if xorigin == 0:
-                xorigin = np.min(x)
-            x = x - xorigin # Set origin to zero
-            print("xorigin:", xorigin)
-
-            if "b2" not in fname:
-                label = ""
-
-            ax.plot(x, sq, marker=marker, linestyle='', markeredgewidth=1.5, color=color, label=label, markerfacecolor=mfc)#, alpha=0.8)
-
-            if args.variable == "cf":
-                ax.set_ylabel("Skin friction coefficient $\overline{C_f}$")
-            elif args.variable == "cp":
-                ax.set_ylabel("Pressure coefficient $\overline{C_p}$")
-            #ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
-            ax.set_xlabel("x/c")
-            #upper = 0.12
-            #ax.set_ylim([ax.get_ylim()[0], upper])
-            #ax.set_xlim([-0.1, 1.1])
-            ax.legend()
+                if args.variable == "cf":
+                    ax.set_ylabel(r"Skin friction coefficient $\overline{C_f}$")
+                elif args.variable == "cp":
+                    ax.set_ylabel(r"Pressure coefficient $\overline{C_p}$")
+                #ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
+                ax.set_xlabel("x/c")
+                #upper = 0.12
+                #ax.set_ylim([ax.get_ylim()[0], upper])
+                #ax.set_xlim([-0.1, 1.1])
+                ax.legend()
     ax.grid()
 
-    if savename:
-        fig.savefig(savename + ".pdf", bbox_inches="tight")
-
-    # zoom mp-lsb
-    if args.variable == "cf":
-        ax.set_xlim([0.33, 0.79])
-        ax.set_ylim([-0.005, 0.045])
-    elif args.variable == "cp":
-        ax.set_xlim([0.34, 0.63])
-        ax.set_ylim([-8.6, -4.9])
-
-    if savename:
-        fig.savefig(savename + "-mplsb.pdf", bbox_inches="tight")
-
-    # zoom f1-lsb
-    if args.variable == "cf":
-        ax.set_xlim([1.08, 1.36])
-        ax.set_ylim([-0.005, 0.022])
-    elif args.variable == "cp":
-        ax.set_xlim([1.18, 1.28])
-        ax.set_ylim([-3.1, -1.5])
-
-    if savename:
-        fig.savefig(savename + "-f1lsb.pdf", bbox_inches="tight")
-
-    # zoom f2-bypass
-    if args.variable == "cf":
-        ax.set_xlim([1.38, 1.64])
-        ax.set_ylim([-0.005, 0.035])
-    elif args.variable == "cp":
-        ax.set_xlim([1.42, 1.49])
-        ax.set_ylim([-0.01, 0.73])
-
-    if savename:
-        fig.savefig(savename + "-f2bypass.pdf", bbox_inches="tight")
+    # if savename:
+    #     fig.savefig(savename + ".pdf", bbox_inches="tight")
+    #
+    # # zoom mp-lsb
+    # if args.variable == "cf":
+    #     ax.set_xlim([0.33, 0.79])
+    #     ax.set_ylim([-0.005, 0.045])
+    # elif args.variable == "cp":
+    #     ax.set_xlim([0.34, 0.63])
+    #     ax.set_ylim([-8.6, -4.9])
+    #
+    # if savename:
+    #     fig.savefig(savename + "-mplsb.pdf", bbox_inches="tight")
+    #
+    # # zoom f1-lsb
+    # if args.variable == "cf":
+    #     ax.set_xlim([1.08, 1.36])
+    #     ax.set_ylim([-0.005, 0.022])
+    # elif args.variable == "cp":
+    #     ax.set_xlim([1.18, 1.28])
+    #     ax.set_ylim([-3.1, -1.5])
+    #
+    # if savename:
+    #     fig.savefig(savename + "-f1lsb.pdf", bbox_inches="tight")
+    #
+    # # zoom f2-bypass
+    # if args.variable == "cf":
+    #     ax.set_xlim([1.38, 1.64])
+    #     ax.set_ylim([-0.005, 0.035])
+    # elif args.variable == "cp":
+    #     ax.set_xlim([1.42, 1.49])
+    #     ax.set_ylim([-0.01, 0.73])
+    #
+    # if savename:
+    #     fig.savefig(savename + "-f2bypass.pdf", bbox_inches="tight")
 
     plt.show()
 
