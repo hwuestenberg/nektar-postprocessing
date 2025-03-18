@@ -12,16 +12,16 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 
-from utilities import get_time_step_size, mser, mse
-from config import directory_names, path_to_directories, dtref, \
+from utilities import get_time_step_size, get_label, mser
+from config import directory_names, path_to_directories, \
     customMetrics, ylabels, ynames, ref_area, ctu_len
 
 
 
 
-# Please-work data
-savename = ""
 
+# Prefix for any saved figures
+savename = ""
 
 
 
@@ -29,74 +29,16 @@ savename = ""
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument(                                    
-    "forces_file", help="Nektar .fce file", type=str, default='FWING_TOTAL_forces-process.fce', nargs='?')
+    "forces_file", help="Nektar .fce file", type=str, default='DragLift-process.fce', nargs='?')
 parser.add_argument(
     "ctuSkip", help="Skip time from the start, in CTUs", type=float, default=0.0, nargs='?')
 args = parser.parse_args()                              
 
+
+# Verbose prints
 print("Using forces_file:", args.forces_file)
+print("Skipping {0} CTUs from the start".format(args.ctuSkip))
 
-print("Skipping {0} CTUs from the start".format(
-    args.ctuSkip))
-
-
-
-
-
-def get_label(full_file_path, dt=0, fsample=0):
-    # Build case specific label for plots
-    label = ""
-    marker = "."
-    mfc='None'
-
-    # Add time step size
-    label += "{0: >3d}".format(
-            int(round(dt/dtref))
-            )
-    label += r"$ \Delta t_{CFL}$"
-
-    # Add sampling frequency
-    if fsample:
-        label += " $f_{sample} =$"
-        label += "${0:.1e}$".format(fsample)
-        label += " "
-
-    if "linear" in full_file_path:
-        label += " linear-implicit"
-    elif "semi" in full_file_path:
-        label += " semi-implicit"
-    elif "substepping" in full_file_path:
-        label += " substepping"
-    if "quasi3d" in full_file_path:
-        label += " Slaughter et al. 2023"
-        mfc='None'
-        marker='o'
-
-    if "5bl" in full_file_path:
-        label += " Mesh A"
-    elif "8bl" in full_file_path:
-        label += " Mesh B"
-    elif "refined" in full_file_path:
-        label += " Mesh C"
-    elif "please-work" in full_file_path:
-        label += " Mesh D"
-
-    if "advfreeze100" in full_file_path:
-        label += " afreeze 100"
-    elif "advfreeze50" in full_file_path:
-        label += " afreeze 50"
-    elif "advfreeze20" in full_file_path:
-        label += " afreeze 20"
-    elif "advfreeze10" in full_file_path:
-        label += " afreeze 10"
-    elif "advfreeze5" in full_file_path:
-        label += " afreeze 5"
-    elif "advfreeze2" in full_file_path:
-        label += " afreeze 2"
-    elif "advfreeze1" in full_file_path:
-        label += " afreeze 1"
-
-    return label, marker, mfc
 
 
 if __name__ == "__main__":
@@ -117,7 +59,7 @@ if __name__ == "__main__":
         full_directory_path = path_to_directories + dirname
 
         forces_file = args.forces_file
-        overlap_names = [forces_file.replace("-process", f"-process-overlap-{i}") for i in [5]]#[0, 1, 2, 3, 4, 5, 10]]
+        overlap_names = [forces_file.replace("-process", f"-process-overlap-{i}") for i in [0]]#[0, 1, 2, 3, 4, 5, 10]]
 
         for filename, file_color in zip(overlap_names, TABLEAU_COLORS):
             print(f"Processing {filename}")
@@ -131,7 +73,7 @@ if __name__ == "__main__":
                 dt = get_time_step_size(full_directory_path)
 
             # Get plot styling
-            label, marker, mfc = get_label(full_file_path, dt)
+            label, marker, mfc, ls, color = get_label(full_file_path, dt)
             print("\nProcessing {0}...".format(label))
 
             # Read file
@@ -146,9 +88,6 @@ if __name__ == "__main__":
             tmax = physTime.max()
             lowerMask = physTime >= tmin + args.ctuSkip
             upperMask = physTime <= tmax
-            # Build mask based on time interval
-            #lowerMask = time > args.beginAverage
-            #upperMask = time < args.endAverage
             mask = (lowerMask == 1) & (upperMask == 1)
             if not np.any(mask):
                 print("No data for interval = [{0}, {1}]".format(tmin + args.ctuSkip, tmax))
@@ -180,15 +119,21 @@ if __name__ == "__main__":
 
                 # Determine end of transient via mser
                 # mse(df[['Time', metric]].to_numpy())
-                intTransient = mser(df, metric, debug_plot = True)
+                intTransient = mser(df, metric, debug_plot = False)
                 timeTransient = physTime.iloc[intTransient]
                 print("End of transient at time {0} CTU and index {1}".format(timeTransient, intTransient))
+
+                # if "overlap" in filename:
+                #     label += " overlap {0}".format(filename.split('overlap-')[1].split('.')[0])
+
                 ax.plot([timeTransient for i in range(2)], [metricData.mean() * 1.2, metricData.mean() * 0.8],
-                        linestyle='dashed', color=file_color, label="End of transient")
+                        linestyle='dashed', color=dir_color, label="End of transient" + " overlap {0}".format(filename.split('overlap-')[1].split('.')[0]))
+
+                print(f"Average {metric} without transient is: {metricData.iloc[intTransient:].mean()}")
 
                 # Plot
                 #ax.plot(physTime, metricData, label=label, color=color)
-                ax.plot(physTime, metricData, color=file_color, alpha=0.3)
+                ax.plot(physTime, metricData, color=dir_color, alpha=0.3, label=label)
 
                 # # Add averaging/mean
                 # stepsPerCtu = ctu_len / dt

@@ -4,8 +4,6 @@ import os, glob, subprocess
 
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
-
-
 params = {'text.usetex': True,
  'font.size' : 10,
 }
@@ -18,8 +16,8 @@ import pandas as pd
 from scipy.interpolate import griddata
 import alphashape
 
-from utilities import get_time_step_size
-from config import directory_names, path_to_directories, dtref, ctu_len, ctu_names, boundary_names
+from utilities import get_time_step_size, get_label
+from config import directory_names, path_to_directories, ctu_len, ctu_names, boundary_names
 
 # Parse command line arguments
 import argparse
@@ -147,45 +145,6 @@ def interpolate_and_average_slices(slicenames):
     return sq_mean
 
 
-def get_label(full_file_path, dt):
-    # Build case specific label for plots
-    label = ""
-    marker = "."
-    mfc='None'
-
-    # Add time step size
-    if dt < dtref:
-        label += "${0:.1f}$".format(
-                round(dt/dtref,1)
-                )
-    else:
-        label += "${0:d}$".format(
-                int(round(dt/dtref))
-                )
-    label += r"$ \Delta t_{CFL}$"
-
-    if "linear" in full_file_path:
-        label += " linear-implicit"
-    elif "semi" in full_file_path:
-        label += " semi-implicit"
-    elif "substepping" in full_file_path:
-        label += " sub-stepping"
-    elif "quasi3d" in full_file_path:
-        label += " Slaughter et al. (2023)"
-        color = 'black'
-
-    if "5bl" in full_file_path:
-        label += " Mesh A"
-    elif "8bl" in full_file_path:
-        label += " Mesh B"
-    elif "refined" in full_file_path:
-        label += " Mesh C"
-    elif "please-work" in full_file_path:
-        label += " Mesh D"
-
-    return label, marker, mfc
-
-
 if __name__ == "__main__":
     fig = plt.figure(figsize=(9,4))
     ax = fig.add_subplot(111)
@@ -199,8 +158,18 @@ if __name__ == "__main__":
         xorigin = 0
 
         # Loop all files (this loops different ctu names and wing elements)
-        # for filename, file_color in zip(filenames, TABLEAU_COLORS):
         for ctuname, ctu_color in zip(ctu_names, TABLEAU_COLORS):
+            # Define case name
+            if "quasi3d" in full_directory_path:
+                dt = 4e-6
+            else:
+                dt = get_time_step_size(full_directory_path)
+
+            # Get plot styling
+            label, marker, mfc, ls, color = get_label(full_directory_path, dt=dt)
+            print("\nProcessing {0}...".format(label))
+
+            # Loops all wing elements (boundaries)
             for bname, b_color in zip(boundary_names, TABLEAU_COLORS):
                 filename = "means/mean_fields_" + ctuname + "_avg_" + var_extension + bname + ".csv"
                 full_file_path = full_directory_path + filename
@@ -208,17 +177,7 @@ if __name__ == "__main__":
                     print("Did not find {0}".format(full_file_path))
                     continue
 
-                # Define case name
-                if "quasi3d" in full_directory_path:
-                    dt = 4e-6
-                else:
-                    dt = get_time_step_size(full_directory_path)
-
-                # Get plot styling
-                label, marker, mfc = get_label(full_file_path, dt)
-                print("\nProcessing {0}...".format(label))
-
-                # Process surface quantity
+                # Process x-coordinate and surface quantity
                 if "quasi3d" in full_directory_path:
                     df = pd.read_csv(full_file_path)
                     x = df["x"] / ctu_len
@@ -234,11 +193,10 @@ if __name__ == "__main__":
                     sq = sq_mean / nslices
                     x = np.array(sampled_x) / ctu_len
 
-                # Shift x to zero, if necessary
+                # Shift x to zero, only done for boundary_names[0]
                 if xorigin == 0:
                     xorigin = np.min(x)
                 x = x - xorigin # Set origin to zero
-                # print("xorigin:", xorigin)
 
                 # Create label for only one of the wings
                 if bname != boundary_names[0]:
