@@ -74,3 +74,48 @@ boundary_names = [
 # directory_names = [
 #     "test_files/"
 # ]
+
+
+
+# #### CONFIG FOR channel flow ####
+# path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/channel/"
+#
+# directory_names = [
+#     "physics/ret180/diagnostic-case/",#P4/svv1e0/dt1e-3/",
+#     ]
+#
+# # Skip initial or final n points for each (individual/subdir!) force file
+# # Note that a small overlap removes the pressure kick after restarting
+# # We found that this improves PSDs
+# force_file_skip_start = 0
+# force_file_skip_end = 0
+#
+#
+# # case-specific definitions
+# ylabels = ["$C_d$", "$C_l$", "$C_s$"]#, "$C_S$", "$C_L$"]
+# ynames = ["Drag", "Lift", "Shear"]#, "Sheer", "Lift"]
+# customMetrics = ["F1-total", "F2-total", "F3-total"]#, "F2-total", "F3-total"]
+#
+# # Characteristic velocity and lengths
+# freestream_velocity = 1.0 # non-dimensional velocity [m/s]
+# chord_length = 1 # mainplane chord [m]
+# ctu_len = chord_length / freestream_velocity # [s]
+# spanlen_npp = 1 # spanwise length for extruded IFW [m]
+# ref_area = ctu_len * spanlen_npp # reference area
+#
+# # reference time step size (CFL ~= 1)
+# dtref = 1e-3
+#
+# # Choose inidividual file names for averages
+# # ctu_names = [
+# #     "ctu_204_210",
+# #     "ctu_204_242",
+# #     "ctu_204_268",
+# #     "ctu_204_287",
+# # ]
+#
+# # Boundary data naming:
+# # b0 : floor
+# boundary_names = [
+#     "b0",
+# ]
