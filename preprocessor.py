@@ -13,6 +13,18 @@ from utilities import get_data_frame
 
 
 
+# Walk through directories and merge files
+file_glob_strs = [
+    'log*',
+    'FWING_TOTAL_forces.fce',
+    'LFW_fia_mp_forces.fce',
+    'LFW_element_1_forces.fce',
+    'LFW_element_2_forces.fce',
+    'DragLift.fce',
+]
+
+
+
 
 def adjust_info_length(iter_info, step_info, cfl_info):
     # Check length for each info to find IO_INFOSTEPS and IO_CFLSTEPS
@@ -76,7 +88,7 @@ def adjust_info_length(iter_info, step_info, cfl_info):
         print("Adjusting size of cfl_info")
         # Set CFL and CFL element to nan
         if len_cfl == 0:
-            cfl_info = [
+            new_cfl_info = [
                 [np.nan for i in range(len_max)],
                 [np.nan for i in range(len_max)]
             ]
@@ -168,7 +180,6 @@ def parse_meta_data(logfile):
 
 def parse_log_file(logfile):
     meta_dict = parse_meta_data(logfile)
-    # print(f"meta_dict: {meta_dict}")
 
     # num_dimensions = meta_dict['num_dimensions']
     num_variables = len(meta_dict['variables'])
@@ -264,15 +275,6 @@ def test_parse_log_file():
 # TODO extend this for History point files (justify time-averaging windows)
 # TODO extend this for Energy (3D) files
 if __name__ == "__main__":
-    # Walk through directories and merge files
-    file_glob_strs = [
-        'log*',
-        'FWING_TOTAL_forces.fce',
-        'LFW_fia_mp_forces.fce',
-        'LFW_element_1_forces.fce',
-        'LFW_element_2_forces.fce',
-        # 'DragLift.fce',
-    ]
     # Loop all possible files (logs, force, ..)
     for file_glob_str in file_glob_strs:
         # Loop all directories (cases)
