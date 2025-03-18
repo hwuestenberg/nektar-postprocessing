@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 
-from utilities import get_time_step_size, get_label, mser
+from utilities import get_time_step_size, get_label, mser, plot_cumulative_mean_std
 from config import directory_names, path_to_directories, \
     customMetrics, ylabels, ynames, ref_area, ctu_len
 
@@ -118,7 +118,6 @@ if __name__ == "__main__":
                     metricData = metricData / ref_area
 
                 # Determine end of transient via mser
-                # mse(df[['Time', metric]].to_numpy())
                 intTransient = mser(df, metric, debug_plot = False)
                 timeTransient = physTime.iloc[intTransient]
                 print("End of transient at time {0} CTU and index {1}".format(timeTransient, intTransient))
@@ -134,6 +133,11 @@ if __name__ == "__main__":
                 # Plot
                 #ax.plot(physTime, metricData, label=label, color=color)
                 ax.plot(physTime, metricData, color=dir_color, alpha=0.3, label=label)
+
+
+                # # Uncomment to plot reverse cumulative mean and std
+                # plot_cumulative_mean_std(metricData, physTime, ax, dir_color, label)
+
 
                 # # Add averaging/mean
                 # stepsPerCtu = ctu_len / dt

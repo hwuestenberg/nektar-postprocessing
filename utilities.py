@@ -104,6 +104,15 @@ def get_label(full_file_path, color = 'tab:blue', dt = 0.0, sampling_Frequency=0
     return label, marker, mfc, ls, color
 
 
+# Compute and plot cumulative average (from back to front)
+def plot_cumulative_mean_std(data, phys_time, axis, color, label):
+    cumulative_avg = data.expanding().mean()
+    cumulative_std = data.expanding().std()
+
+    axis.errorbar(phys_time, cumulative_avg, yerr=cumulative_std, label='', color=color, marker='', linestyle='',
+                  alpha=0.01)
+    axis.plot(phys_time, cumulative_avg, label=label, color=color)
+
 
 
 
