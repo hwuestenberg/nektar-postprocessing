@@ -1,9 +1,21 @@
 
 
-#### CONFIG FOR 3D extruded IFW ####
 DEBUG = True
 
+
+
+#### CONFIG FOR 3D extruded IFW ####
+# Walk through directories and merge files
+file_glob_strs = [
+    'log*',
+    'FWING_TOTAL_forces.fce',
+    'LFW_fia_mp_forces.fce',
+    'LFW_element_1_forces.fce',
+    'LFW_element_2_forces.fce',
+]
+
 path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
+save_directory = "/home/henrik/Documents/simulation_data/cpc-figures/"
 
 directory_names = [
     "3d/please-work/physics/semiimplicit/dt1e-5/",
@@ -13,10 +25,12 @@ directory_names = [
     "3d/please-work/physics/linearimplicit/dt2e-4/",
     "3d/please-work/physics/linearimplicit/dt5e-4/",
     "3d/please-work/physics/linearimplicit/dt1e-3/",
-    # "3d/please-work/physics/substepping/dt2e-4/",
-    # "3d/please-work/physics/substepping/dt1e-4/",
-    # "3d/please-work/physics/substepping/dt5e-5/",
-    # "3d/please-work/physics/substepping/dt1e-5/",
+    # "3d/please-work/physics/linearimplicit-strong/dt1e-4/",
+    "3d/please-work/physics/substepping/dt1e-5/",
+    "3d/please-work/physics/substepping/dt5e-5/",
+    "3d/please-work/physics/substepping/dt1e-4/",
+    "3d/please-work/physics/substepping/dt2e-4/",
+    # "quasi3d/james/farringdon_data/"
     ]
 
 # Skip initial or final n points for each (individual/subdir!) force file
@@ -41,8 +55,12 @@ ref_area = ctu_len * spanlen_npp # reference area
 # reference time step size (CFL ~= 1)
 dtref = 1e-5
 
+# divergence tolerance for detection
+divtol = 1e3
+
 # Choose inidividual file names for averages
 ctu_names = [
+    "ctu_204_210",
     "ctu_204_242",
     "ctu_204_268",
     "ctu_204_287",
@@ -61,6 +79,10 @@ boundary_names = [
 
 
 #### CONFIG FOR 2D cylinder ####
+# file_glob_strs = [
+#     'log*',
+#     'DragLift.fce',
+# ]
 # path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/cylinder/2d/hx1/physics/"
 #
 # directory_names = [
@@ -78,6 +100,10 @@ boundary_names = [
 
 
 # #### CONFIG FOR channel flow ####
+# file_glob_strs = [
+#     'log*',
+#     'DragLift.fce',
+# ]
 # path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/channel/"
 #
 # directory_names = [
