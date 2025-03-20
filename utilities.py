@@ -52,8 +52,23 @@ def get_time_step_size(directory_name):
     return dt
 
 
+def get_scheme(full_file_path):
+    if "linear" in full_file_path:
+        scheme = "linear-implicit"
+    elif "semi" in full_file_path:
+        scheme = "semi-implicit"
+    elif "substepping" in full_file_path:
+        scheme = "sub-stepping"
+    elif "quasi3d" in full_file_path:
+        scheme = "Slaughter et al. (2023)"
+    else:
+        scheme = ""
+
+    return scheme
+
+
+# Build case specific label and style for plots (define defaults here)
 def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue'):
-    # Build case specific label and style for plots (define defaults here)
     label = ""
     marker = "o"
     mfc = 'None'
@@ -83,14 +98,10 @@ def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue
         label += " "
         label += "Re = {0:.1e}".format(float(re))
 
-    if "linear" in full_file_path:
-        label += " linear-implicit"
-    elif "semi" in full_file_path:
-        label += " semi-implicit"
-    elif "substepping" in full_file_path:
-        label += " sub-stepping"
-    elif "quasi3d" in full_file_path:
-        label += " Slaughter et al. (2023)"
+    label += f" {get_scheme(full_file_path)}"
+
+    # Reference data in black
+    if "quasi3d" in full_file_path:
         color = 'black'
 
     if "5bl" in full_file_path:
@@ -129,15 +140,12 @@ def plot_cumulative_mean_std(data, phys_time, axis, color, label):
 
 
 """
-def mser(signal : pd.Series, time : pd.Series, debug_plot : bool = False):
+def mser(signal : pd.Series, time : pd.Series, stride_length : int = 1, debug_plot : bool = False):
     # Determine truncation range
     # i.e. range in which we expect the transient to be
     npoints = signal.shape[0]
     truncationRange = int(npoints / 2) # For simplicity, we choose half of all data
     # print("npoints {0}, truncRange 0 to {1}".format(npoints, truncationRange))
-
-    # Choose stride length (accuracy vs comp. efficiency)
-    stride_length = 1# if npoints < 1e4 else 10
 
     # Save mean-squared-error sums for each truncation
     sums = list()
