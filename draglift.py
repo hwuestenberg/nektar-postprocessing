@@ -14,32 +14,27 @@ from scipy import signal
 
 from utilities import get_time_step_size, get_label, mser, plot_cumulative_mean_std
 from config import directory_names, path_to_directories, \
-    customMetrics, ynames, ref_area, ctu_len
-
-
-
-
-
-# Prefix for any saved figures
-savename = ""
+    customMetrics, ref_area, ctu_len, save_directory
 
 # Choose lift [1] or drag [0]
 metric = customMetrics[1]
 
+forces_file = "FWING_TOTAL_forces-process.fce"
+ctu_skip = 0.0 # sort of redundant with MSER
 
-# Parse command line arguments                          
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument(                                    
-    "forces_file", help="Nektar .fce file", type=str, default='FWING_TOTAL_forces-process.fce', nargs='?')
-parser.add_argument(
-    "ctuSkip", help="Skip time from the start, in CTUs", type=float, default=0.0, nargs='?')
-args = parser.parse_args()                              
+# Prefix for any saved figures
+savename = f"{metric}-{forces_file.split('.')[0]}.pdf"
+savename = save_directory + savename
+
+# Plot adjusting
+xlim  = []
+ylim  = []
+
 
 
 # Verbose prints
-print("Using forces_file:", args.forces_file)
-print("Skipping {0} CTUs from the start".format(args.ctuSkip))
+print("Using forces_file:", forces_file)
+print("Skipping {0} CTUs from the start".format(ctu_skip))
 
 
 
@@ -51,19 +46,20 @@ if __name__ == "__main__":
     if metric == customMetrics[0]:
         ylabel = r"PSD($C_d$)"
     ax.set_ylabel(ylabel)
-    ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
     ax.set_xlabel(r"$t^\star$")
-    ax.grid(True, which='both')
+    ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
+    ax.set_xscale("linear")
+    ax.set_yscale("linear")
+    ax.grid(True, which='both', axis='both')
 
     # Loop all files
-    for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
+    for dirname in directory_names:
         # Setup paths
         full_directory_path = path_to_directories + dirname
 
-        forces_file = args.forces_file
         filename = forces_file.replace("-process", f"-process-overlap-5") # add overlap
 
-        n_downsamples = [i for i in [1, 2, 5, 10, 20, 100]]
+        n_downsamples = [i for i in [1]]#, 2, 5, 10, 20, 100]]
 
         for n_downsample, downsample_color in zip(n_downsamples, TABLEAU_COLORS):
             print(f"\nProcessing {filename} with downsampling {n_downsample}")
@@ -91,11 +87,11 @@ if __name__ == "__main__":
             # Build mask based on time interval
             tmin = physTime.min()
             tmax = physTime.max()
-            lowerMask = physTime >= tmin + args.ctuSkip
+            lowerMask = physTime >= tmin + ctu_skip
             upperMask = physTime <= tmax
             mask = (lowerMask == 1) & (upperMask == 1)
             if not np.any(mask):
-                print("No data for interval = [{0}, {1}]".format(tmin + args.ctuSkip, tmax))
+                print("No data for interval = [{0}, {1}]".format(tmin + ctu_skip, tmax))
                 continue
             else:
                 print("Using data on interval = [{0}, {1}]".format(physTime[mask].iloc[0], physTime[mask].iloc[-1]))
@@ -118,7 +114,7 @@ if __name__ == "__main__":
                 metricData = metricData / ref_area
 
             # Downsample
-            # Note do this before MSER
+            # Note: do this before MSER
             if n_downsample > 1:
                 metricData = metricData[::n_downsample]
                 physTime = physTime[::n_downsample]
