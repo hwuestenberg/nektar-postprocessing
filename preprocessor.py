@@ -8,20 +8,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, DEBUG
+from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, DEBUG, file_glob_strs
 from utilities import get_data_frame
-
-
-
-# Walk through directories and merge files
-file_glob_strs = [
-    'log*',
-    'FWING_TOTAL_forces.fce',
-    'LFW_fia_mp_forces.fce',
-    'LFW_element_1_forces.fce',
-    'LFW_element_2_forces.fce',
-    'DragLift.fce',
-]
 
 
 
