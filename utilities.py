@@ -1,6 +1,7 @@
 #!/usr/bin/env  python3
 import os, sys, subprocess, glob
 import numpy as np
+import pandas
 import pandas as pd
 from matplotlib import pyplot as plt
 
@@ -51,7 +52,7 @@ def get_time_step_size(directory_name):
     return dt
 
 
-def get_label(full_file_path, color = 'tab:blue', dt = 0.0, sampling_Frequency=0):
+def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue'):
     # Build case specific label and style for plots (define defaults here)
     label = ""
     marker = "o"
@@ -60,7 +61,7 @@ def get_label(full_file_path, color = 'tab:blue', dt = 0.0, sampling_Frequency=0
     color = color
 
     # Add time step size
-    if dt < dtref:
+    if dt > dtref:
         label += "${0:.1f}$".format(
             round(dt / dtref, 1)
         )
@@ -71,9 +72,9 @@ def get_label(full_file_path, color = 'tab:blue', dt = 0.0, sampling_Frequency=0
     label += r"$ \Delta t_{CFL}$"
 
     # Add sampling frequency
-    if sampling_Frequency:
+    if sampling_frequency:
         label += " $f_{sample} =$"
-        label += "${0:.1e}$".format(sampling_Frequency)
+        label += "${0:.1e}$".format(sampling_frequency)
         label += " "
 
     # Add reynolds number
@@ -128,15 +129,15 @@ def plot_cumulative_mean_std(data, phys_time, axis, color, label):
 
 
 """
-def mser(dataframe, signalKey='signal', timeKey='Time', debug_plot = False):
+def mser(signal : pd.Series, time : pd.Series, debug_plot : bool = False):
     # Determine truncation range
     # i.e. range in which we expect the transient to be
-    npoints = dataframe.shape[0]
+    npoints = signal.shape[0]
     truncationRange = int(npoints / 2) # For simplicity, we choose half of all data
     # print("npoints {0}, truncRange 0 to {1}".format(npoints, truncationRange))
 
     # Choose stride length (accuracy vs comp. efficiency)
-    stride_length = 100# if npoints < 1e4 else 10
+    stride_length = 1# if npoints < 1e4 else 10
 
     # Save mean-squared-error sums for each truncation
     sums = list()
@@ -144,7 +145,7 @@ def mser(dataframe, signalKey='signal', timeKey='Time', debug_plot = False):
     # Loop with increasing truncation
     for d in range(0, truncationRange, stride_length):
         # Extract truncated signal
-        truncSignal = dataframe[signalKey].iloc[d:]
+        truncSignal = signal.iloc[d:]
 
         # Determine mean-squared-error against truncated mean
         sums.append(
@@ -155,7 +156,7 @@ def mser(dataframe, signalKey='signal', timeKey='Time', debug_plot = False):
     if debug_plot:
         fig = plt.figure(figsize=(8,4))
         ax = fig.add_subplot(111)
-        ax.plot(dataframe[timeKey].iloc[:truncationRange:stride_length] / ctu_len, sums, label=signalKey)
+        ax.plot(time.iloc[:truncationRange:stride_length] / ctu_len, sums)
 
     # Multiply by stride length to account for "lower resolution"
     dstar = np.argmin(sums) * stride_length
