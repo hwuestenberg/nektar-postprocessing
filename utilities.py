@@ -1,9 +1,10 @@
 #!/usr/bin/env  python3
-import os, sys, subprocess, glob
+import os, sys, subprocess, re
+from glob import glob
 import numpy as np
 import pandas
 import pandas as pd
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, cm
 
 # Import for charles plots
 # from CharLESForces import *
@@ -14,9 +15,42 @@ from config import ctu_len, dtref
 
 
 
+def get_ctu_names(glob_string, descending=False):
+
+    # Find starts and mids automatically
+    files = glob(glob_string)
+
+    # Extracted numbers will be stored here
+    starts = []
+    mids = []
+
+    # Regex pattern to find two numbers in the filename
+    pattern = re.compile(r'ctu_(\d+)_(\d+)_')
+
+    # Loop through the filenames and extract numbers
+    for filename in files:
+        match = pattern.search(filename)
+        if match:
+            start, end = match.group(1), match.group(2)
+            starts.append(start)
+            mids.append(end)
+
+    # Sort descending
+    starts = sorted(starts, reverse=descending)
+    mids = sorted(mids, reverse=descending)
+
+    # # use only unique
+    # starts = list(dict.fromkeys(starts))
+    # mids = list(dict.fromkeys(mids))
+
+    return starts, mids
+
 
 
 def get_data_frame(filename, skip_start = 0, skip_end = 0):
+    # Check file type
+    file_type = "." + filename.split('.')[-1]
+
     # Pre-read file and check for 2D/3D
     headerskip = 0
     with open(filename, 'r') as f:
@@ -25,64 +59,128 @@ def get_data_frame(filename, skip_start = 0, skip_end = 0):
             if "Time" in line:
                 headerskip = i
                 break
+            if file_type == ".his" and not "#" in line:
+                headerskip = i-1
+                break
 
     # Read file
     df = pd.read_csv(filename, header=headerskip, sep=r"(?!#)\s+", engine='python')
-    df = df.iloc[skip_start:]
-    if skip_end != 0:
-        df = df.iloc[:-skip_end]
 
+    if file_type == ".his":
+        n_his_points = headerskip
+
+        # Adjust columns for 2D or 3D
+        nvars = len(df.columns)
+        if nvars == 5:
+            df.columns = ['Time', 'u', 'v', 'w', 'p']
+        else:
+            df.columns = ['Time', 'u', 'v', 'p']
+
+        # Skip points at start or end, if set
+        if skip_start:
+            df = df.iloc[(n_his_points*skip_start):]
+        if skip_end != 0:
+            df = df.iloc[:-(n_his_points*skip_end)]
 
     # Remove hash-column, necessary for .fce files
-    temp_columns = df.columns[1:]
-    df = df.iloc[:,:-1]
-    df.columns = temp_columns
+    else:
+        temp_columns = df.columns[1:]
+        df = df.iloc[:,:-1]
+        df.columns = temp_columns
+
+        # Skip points at start or end, if set
+        if skip_start:
+            df = df.iloc[skip_start:]
+        if skip_end != 0:
+            df = df.iloc[:-skip_end]
 
     return df
 
 
 def get_time_step_size(directory_name):
+    # james' case is sampled at higher frequency than 1
+    if "quasi3d" in directory_name:
+        return 4e-6
+
     # Read cputime.dat
     dftime = pd.read_csv(directory_name + "log_info.csv", sep=",")
 
     # Get time/step info for x-axis
     phystime = dftime["phys_time"].to_numpy()
     steps = dftime["steps"].to_numpy()
-    dt = (phystime[1] - phystime[0]) / (steps[1] - steps[0]) # Get time step size
+    dt = (phystime[10] - phystime[0]) / (steps[10] - steps[0]) # Get time step size
     return dt
 
 
+def get_stabilisation(full_file_path):
+    if "gjp" in full_file_path:
+        str = " GJP"
+    elif "dgsvv" in full_file_path:
+        str = " DGSVV"
+    else: # default to semi-implicit
+        str = ""
+
+    return str
+
 def get_scheme(full_file_path):
     if "linear" in full_file_path:
-        scheme = "linear-implicit"
+        scheme = "linear-implicit"# (weak pressure)"
     elif "semi" in full_file_path:
-        scheme = "semi-implicit"
+        scheme = "semi-implicit"# (strong pressure)"
+    elif "weak" in full_file_path:
+        scheme = "semi-implicit"# (weak pressure)"
     elif "substepping" in full_file_path:
         scheme = "sub-stepping"
     elif "quasi3d" in full_file_path:
         scheme = "Slaughter et al. (2023)"
-    else:
-        scheme = ""
+    else: # default to semi-implicit
+        # scheme = ""
+        scheme = "semi-implicit"# (strong pressure)"
 
     return scheme
 
+def get_color_by_scheme(full_file_path, dtcfd):
+    if "linear" in full_file_path:
+        cmap = cm.get_cmap("Oranges")  # Use the "Oranges" colormap
+        # color = cmap(0.2 + 0.8 * np.log(dtcfd) / np.log(100)) if dtcfd != 1 else 'tab:orange'
+        color = 'tab:orange'
+        if dtcfd == 1:
+            color = 'tab:blue'
+        elif dtcfd > 10:
+            color = 'tab:green'
+    elif "semi" in full_file_path:
+        color = 'tab:blue'
+    elif "substepping" in full_file_path:
+        cmap = cm.get_cmap("Greens")
+        # color = cmap(0.2 + 0.8 * np.log(dtcfd) / np.log(100)) if dtcfd != 1 else 'tab:green'
+        color = 'tab:green'
+    elif "quasi3d" in full_file_path:
+        color = "black"
+    elif "weak" in full_file_path:
+        color = 'tab:purple'
+    else:
+        color = "red"
+
+    return color
+
+
 
 # Build case specific label and style for plots (define defaults here)
-def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue'):
+def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue', raw_label = False):
     label = ""
-    marker = "o"
+    marker = "."
     mfc = 'None'
     ls = 'solid'
-    color = color
 
     # Add time step size
-    if dt > dtref:
-        label += "${0:.1f}$".format(
-            round(dt / dtref, 1)
+    dtcfd = round(dt / dtref, 1)
+    if dt >= dtref:
+        label += "{0:d}".format(
+            int(dtcfd)
         )
     else:
-        label += "{0: >3d}".format(
-            int(round(dt / dtref))
+        label += "{0:.1f}".format(
+            dtcfd
         )
     label += r"$ \Delta t_{CFL}$"
 
@@ -92,26 +190,32 @@ def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue
         label += "${0:.1e}$".format(sampling_frequency)
         label += " "
 
-    # Add reynolds number
-    if "/re" in full_file_path:
-        re = full_file_path.split("/re")[-1].split("/")[0]
-        label += " "
-        label += "Re = {0:.1e}".format(float(re))
+    # # Add reynolds number # disabled for channel
+    # if "/re" in full_file_path:
+    #     re = full_file_path.split("/re")[-1].split("/")[0]
+    #     label += " "
+    #     label += "Re = {0:.1e}".format(float(re))
 
     label += f" {get_scheme(full_file_path)}"
+    color = get_color_by_scheme(full_file_path, dtcfd)
 
-    # Reference data in black
-    if "quasi3d" in full_file_path:
-        color = 'black'
+    label += f" {get_stabilisation(full_file_path)}"
 
-    if "5bl" in full_file_path:
-        label += " Mesh A"
-    elif "8bl" in full_file_path:
-        label += " Mesh B"
-    elif "refined" in full_file_path:
-        label += " Mesh C"
-    elif "please-work" in full_file_path:
-        label += " Mesh D"
+    # if "weak" in full_file_path:
+    #     ls = 'dashed'
+
+    # Add mesh info
+    # if "5bl" in full_file_path:
+    #     label += " Mesh A"
+    # elif "8bl" in full_file_path:
+    #     label += " Mesh B"
+    # elif "refined" in full_file_path:
+    #     label += " Mesh C"
+    # elif "please-work" in full_file_path:
+    #     label += " Mesh D"
+
+    if raw_label:
+        label = full_file_path
 
     return label, marker, mfc, ls, color
 
@@ -125,6 +229,51 @@ def plot_cumulative_mean_std(data, phys_time, axis, color, label):
                   alpha=0.01)
     axis.plot(phys_time, cumulative_avg, label=label, color=color)
 
+
+def filter_time_interval(physTime : pd.Series, signal : pd.Series, signal_len_from_end : float, use_mask : bool = False):
+    # Mask based criterion
+    tmin = physTime.min()
+    tmax = physTime.max()
+
+    # Compute lower bound
+    # lower_criterion = tmin + ctu_skip
+    lower_criterion = tmax - signal_len_from_end
+
+    # Masking approach
+    if use_mask:
+        lowerMask = physTime >= lower_criterion # determine start from end
+        upperMask = physTime <= tmax
+        mask = (lowerMask == 1) & (upperMask == 1)
+        if not np.any(mask):
+            print("No data for interval = [{0}, {1}]".format(tmax - signal_len_from_end, tmax))
+        else:
+            print("Using data on interval = [{0}, {1}]".format(physTime[mask].iloc[0], physTime[mask].iloc[-1]))
+
+        physTime = physTime[mask]
+        signal = signal[mask]
+    else:
+        # Find nearest based reduction
+        index = abs(physTime - (lower_criterion)).idxmin()
+        print(f"Filtering time. Start index: {index} at time: {physTime.iloc[index]}")
+        physTime = physTime.iloc[index:]
+        signal = signal.iloc[index:]
+
+    return physTime, signal
+
+
+def check_sampling_rates(physTime, debug_plot=False):
+    time_diffs = physTime.diff()
+    if time_diffs.nunique() > 1:
+        print(f"Sample rate is CHANGING with {time_diffs}")
+    else:
+        print(f"Sample rate is CONSTANT with {time_diffs.unique()}")
+
+    if debug_plot:
+        plt.figure()
+        plt.plot(time_diffs)
+        plt.xscale('linear')
+        plt.yscale('log')
+        plt.show()
 
 
 
@@ -145,7 +294,6 @@ def mser(signal : pd.Series, time : pd.Series, stride_length : int = 1, debug_pl
     # i.e. range in which we expect the transient to be
     npoints = signal.shape[0]
     truncationRange = int(npoints / 2) # For simplicity, we choose half of all data
-    # print("npoints {0}, truncRange 0 to {1}".format(npoints, truncationRange))
 
     # Save mean-squared-error sums for each truncation
     sums = list()

@@ -8,13 +8,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, DEBUG, file_glob_strs
+from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, file_glob_strs, \
+    use_iterations, use_cfl, DEBUG, customMetrics
 from utilities import get_data_frame
 
 
 
-
-def adjust_info_length(iter_info, step_info, cfl_info):
+def adjust_info_length(step_info, cfl_info = [[]], iter_info = [[]]):
     # Check length for each info to find IO_INFOSTEPS and IO_CFLSTEPS
     # Note that len(iter) (iteration info) is always equal to number of time steps
     len_iter = len(iter_info[0])
@@ -22,8 +22,12 @@ def adjust_info_length(iter_info, step_info, cfl_info):
     len_cfl = len(cfl_info[0])
     len_max = max(len_iter, len_step, len_cfl)
 
-    io_infosteps = int(len_iter / len_step)
-    io_cflsteps =  int(len_iter / len_cfl)
+    # Determine verbose output rate of step and cfl info
+    io_infosteps = step_info[0][0]
+    io_cflsteps = 0
+    if not len_cfl == 0:
+        ratio_cfl_step = len_cfl / len_step
+        io_cflsteps =  int(ratio_cfl_step / io_infosteps) if len_cfl > len_step else int(io_infosteps / ratio_cfl_step)
     print(f"Longest list: {len_max}, io_infosteps = {io_infosteps}, io_cflsteps = {io_cflsteps}")
 
     # Adjust step_info
@@ -72,7 +76,7 @@ def adjust_info_length(iter_info, step_info, cfl_info):
 
     # Adjust len_cfl
     new_cfl_info = []
-    if len_cfl != len_max:
+    if not len_cfl == 0 and not len_cfl == len_max:
         print("Adjusting size of cfl_info")
         # Set CFL and CFL element to nan
         if len_cfl == 0:
@@ -195,20 +199,21 @@ def parse_log_file(logfile):
         for i, line in enumerate(f):
             ## Process iteration counts
             # Only process lines that contain 'iterations made'
-            if 'iterations made' in line:
-                # Extract the fifth field from the space-separated line
-                fields = re.split(r'\s+', line.strip())
-                if len(fields) >= 5:
-                    iter_info[i_variable].append(fields[4])  # 5th field is index 4
-                # TODO use regex for all/most quantities here
-                # matches = re.findall(iter_pattern, line)
+            if use_iterations:
+                if 'iterations made' in line:
+                    # Extract the fifth field from the space-separated line
+                    fields = re.split(r'\s+', line.strip())
+                    if len(fields) >= 5:
+                        iter_info[i_variable].append(fields[4])  # 5th field is index 4
+                    # TODO use regex for all/most quantities here
+                    # matches = re.findall(iter_pattern, line)
 
-                i_variable += 1
+                    i_variable += 1
 
-                # Reset variable counter after all variables have been processed once
-                # identifies next time step for iteration counts
-                if i_variable == num_variables:
-                    i_variable = 0
+                    # Reset variable counter after all variables have been processed once
+                    # identifies next time step for iteration counts
+                    if i_variable == num_variables:
+                        i_variable = 0
 
             ## Process: "Steps: 1        Time: 7.00050e+00  CPU Time: 98.902s"
             if 'Steps:' in line and 'Time:' in line:
@@ -220,31 +225,45 @@ def parse_log_file(logfile):
 
 
             ## Process: "CFL: 8.30743e+01 (in elmt 26837)"
-            if 'CFL:' in line and 'in elmt' in line:
-                # Extract the fifth field from the space-separated line
-                fields = re.search(cfl_pattern, line.strip())
-                cfl_info[0].append(float(fields.group(1)))
-                cfl_info[1].append(int(fields.group(2)))
+            if use_cfl:
+                if 'CFL:' in line and 'in elmt' in line:
+                    # Extract the fifth field from the space-separated line
+                    fields = re.search(cfl_pattern, line.strip())
+                    cfl_info[0].append(float(fields.group(1)))
+                    cfl_info[1].append(int(fields.group(2)))
 
     # Adjust length for equal length lists
-    if len(step_info[0]) != len(iter_info[0]) or len(step_info[0]) != len(cfl_info[0]):
-        step_info, cfl_info = adjust_info_length(iter_info, step_info, cfl_info)
+    if use_iterations and len(step_info[0]) != len(iter_info[0]):
+        step_info, cfl_info = adjust_info_length(step_info, cfl_info, iter_info)
+    elif use_cfl and len(step_info[0]) != len(cfl_info[0]):
+        step_info, cfl_info = adjust_info_length(step_info, cfl_info)
+    else:
+        step_info, _ = adjust_info_length(step_info)
 
 
     # Create data frame from lists
     data_dict = {
-        'iterations_p': iter_info[0],
-        'iterations_u': iter_info[1],
-        'iterations_v': iter_info[2],
         'steps' : step_info[0],
         'phys_time' : step_info[1],
         'cpu_time' : step_info[2],
-        'cfl' : cfl_info[0],
-        'cfl_element' : cfl_info[1],
     }
-    # Add w only for 3D problems
-    if num_variables == 4:
-        data_dict['iterations_w'] = iter_info[3]
+
+    # Add cfl info
+    if use_cfl:
+        data_dict['cfl'] = cfl_info[0]
+        data_dict['cfl_element'] = cfl_info[1]
+
+    # Add iterations info
+    if use_iterations:
+        data_dict['iterations_p'] = iter_info[0]
+        data_dict['iterations_u'] = iter_info[1]
+        data_dict['iterations_v'] = iter_info[2]
+
+        # Add w only for 3D problems
+        if num_variables == 4:
+            data_dict['iterations_w'] = iter_info[3]
+
+    # Convert to dataframe and return
     df_log = pd.DataFrame(data_dict)
 
     return df_log
@@ -307,6 +326,8 @@ if __name__ == "__main__":
                     df_file = parse_log_file(process_file)
                 elif 'fce' in file_glob_str:
                     df_file = get_data_frame(process_file, skip_start = force_file_skip_start, skip_end = force_file_skip_end)
+                elif 'his' in file_glob_str:
+                    df_file = get_data_frame(process_file, skip_start=force_file_skip_start, skip_end=force_file_skip_end)
 
                 # Copy initial dataframe or concatenate parsed logs
                 if df_full.empty:
@@ -330,7 +351,7 @@ if __name__ == "__main__":
             if DEBUG:
                 # print(df_full)
                 if "TOTAL" in file_glob_str:
-                    df_full.plot(x='Time', y='F3-total', label=directory_name)
+                    df_full.plot(x='Time', y=customMetrics[-1], label=directory_name, kind='scatter')
                 if "log" in file_glob_str:
                     df_full.plot(y='phys_time', label=directory_name)
 
@@ -339,5 +360,6 @@ if __name__ == "__main__":
             del df_file
 
     # Debug print/plot
-    plt.legend()
-    plt.show()
+    if DEBUG:
+        plt.legend()
+        plt.show()
