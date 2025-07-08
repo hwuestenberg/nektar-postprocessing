@@ -1,8 +1,9 @@
 
 case = 'eifw'
-DEBUG = False
+DEBUG = True
 use_cfl = False
-use_iterations = False
+use_iterations = True
+scaling = True
 
 
 #### CONFIG FOR 3D extruded IFW ####
@@ -10,13 +11,13 @@ if case == 'eifw':
 
     # Walk through directories and merge files
     file_glob_strs = [
-        'log*',
-        'FWING_TOTAL_forces.fce',
+        'log.*',
+        # 'FWING_TOTAL_forces.fce',
         # 'LFW_fia_mp_forces.fce',
         # 'LFW_element_1_forces.fce',
         # 'LFW_element_2_forces.fce',
         # 'mainplane_spanwise.his'
-        "mainplane-suction-midplane.his"
+        # "mainplane-suction-midplane.his"
     ]
 
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
@@ -27,11 +28,11 @@ if case == 'eifw':
         "3d/please-work/physics/semiimplicit/dt1e-5/",
         # "3d/please-work/physics/semiimplicit/dt1e-5-kinvis/",
         # "3d/please-work/physics/semiimplicit/dt1e-5/animation_280_285/",
-        "3d/please-work/physics/linearimplicit/dt1e-5/",
+        # "3d/please-work/physics/linearimplicit/dt1e-5/",
         # "3d/please-work/physics/linearimplicit/dt5e-5/",
-        "3d/please-work/physics/linearimplicit/dt1e-4/",
+        # "3d/please-work/physics/linearimplicit/dt1e-4/",
         # "3d/please-work/physics/linearimplicit/dt2e-4/",
-        "3d/please-work/physics/linearimplicit/dt5e-4/",
+        # "3d/please-work/physics/linearimplicit/dt5e-4/",
         # "3d/please-work/physics/linearimplicit/dt1e-3/",
         # "3d/please-work/physics/substepping/dt1e-5/",
         # "3d/please-work/physics/substepping/dt5e-5/",
