@@ -129,8 +129,8 @@ if __name__ == "__main__":
             df_case = pd.DataFrame([case_dict])
             df_stat = pd.concat([df_stat, df_case], axis=0, ignore_index=True)
 
-            # Verbose check concatenation
-            print(df_stat)
+        # Verbose check concatenation
+        print(df_stat)
 
 
     # Plot by scheme: speedup
@@ -139,14 +139,16 @@ if __name__ == "__main__":
         # Extract data for this plot
         df_plot = df_stat.loc[df_stat['scheme'] == scheme]
 
-        # Compute derived quantities
-        df_plot['speedup'] = df_plot[f'{metric}-mean'][0] / df_plot[f'{metric}-mean']
-        df_plot['parallelefficiency'] = 1 - ((2 ** df_plot.index - df_plot['speedup']) / df_plot['speedup'])
+        # Compute speed-up (strong scaling)
+        su = df_plot[f'{metric}-mean'].iloc[0] / df_plot[f'{metric}-mean']
+
+        # Compute parallel efficiency (strong scaling)
+        pe = 1 - ((2 ** np.arange(len(df_plot)) - su) / su)
 
         # Plot
-        ax_su.plot(df_plot['nodes'] / nodes_ref, df_plot['speedup'], marker='o', label=scheme)
-        ax_pe.plot(df_plot['nodes'] / nodes_ref, df_plot['parallelefficiency'], marker='o', label=scheme)
-        # ax.errorbar(df_plot['nodes'] / nodes_ref, df_plot['speedup'], df_plot[f'{metric}-std'],
+        ax_su.plot(df_plot['nodes'] / nodes_ref, su, marker='o', label=scheme)
+        ax_pe.plot(df_plot['nodes'] / nodes_ref, pe, marker='o', label=scheme)
+        # ax.errorbar(df_plot['nodes'] / nodes_ref, su, df_plot[f'{metric}-std'],
         #             color=scheme_color, capsize=4)
 
     ## Aesthetics

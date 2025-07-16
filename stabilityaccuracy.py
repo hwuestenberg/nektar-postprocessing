@@ -1,5 +1,3 @@
-#!/bin/python3
-
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
 params = {'text.usetex': True,
@@ -15,6 +13,7 @@ import pandas as pd
 from utilities import get_time_step_size, mser, get_label, get_scheme
 from config import directory_names, path_to_directories, dtref, \
     customMetrics, ref_area, ctu_len, divtol, force_file_skip_start, save_directory, file_glob_strs
+
 
 # Choose lift [1] or drag [0]
 metric = customMetrics[0]
@@ -42,7 +41,7 @@ print("Using forces_file:", forces_file)
 if __name__ == "__main__":
 
     # Create figure and axis
-    fig = plt.figure(figsize=(3,2))
+    fig = plt.figure(figsize=(3, 2))
     ax = fig.add_subplot(111)
     ylabel = r"$\overline{C}_l$"
     if metric == customMetrics[0]:
@@ -80,14 +79,7 @@ if __name__ == "__main__":
         case_dict = {'scheme': get_scheme(full_file_path)}
 
         # Get time step size
-        # Note that we cannot detect 4e-6 from force file
-        # because the sampling rate is set to 4e-5
-        if "quasi3d" in full_directory_path:
-            dt = 4e-6
-        elif "dt5e-4" in full_directory_path:
-            dt = 6e-4
-        else:
-            dt = get_time_step_size(full_directory_path)
+        dt = get_time_step_size(full_directory_path)
         case_dict['dt'] = dt
 
         # Get plot styling

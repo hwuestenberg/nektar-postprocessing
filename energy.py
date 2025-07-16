@@ -19,7 +19,6 @@ axzeta.set_xlabel("Time [sec]")
 axzeta.set_ylabel("Enstrophy")
 
 
-
 savename = save_directory + "dissipation-highre"
 
 
