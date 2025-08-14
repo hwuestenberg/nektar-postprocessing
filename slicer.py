@@ -1,4 +1,4 @@
-#!/home/henrik/Downloads/ParaView-5.11.0-MPI-Linux-Python3.9-x86_64/bin/pvpython
+#!/home/henrik/sw/ParaView-5.11.1-MPI-Linux-Python3.9-x86_64/bin/pvpython
 
 import argparse
 import json

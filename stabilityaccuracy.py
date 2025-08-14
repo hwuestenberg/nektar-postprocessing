@@ -1,5 +1,3 @@
-#!/bin/python3
-
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
 params = {'text.usetex': True,
@@ -16,15 +14,21 @@ from utilities import get_time_step_size, mser, get_label, get_scheme
 from config import directory_names, path_to_directories, dtref, \
     customMetrics, ref_area, ctu_len, divtol, force_file_skip_start, save_directory, file_glob_strs
 
+
 # Choose lift [1] or drag [0]
 metric = customMetrics[0]
 forces_file = file_glob_strs[1]
 
-averaging_len = 100 # [CTU] redundant due to MSER, just use large number
-n_downsample = 1
+averaging_len = 30 # [CTU] redundant due to MSER, just use large number
+n_downsample = 2
 
-savename = f"{metric}-{forces_file.split('.')[0]}.pdf"
+savename = f"mean-{metric}-{forces_file.split('.')[0]}"
 savename = save_directory + savename
+
+
+
+xlim = [8e-6 / dtref, 8e-4 / dtref]
+ylim = []
 
 
 # Verbose prints
@@ -37,17 +41,18 @@ print("Using forces_file:", forces_file)
 if __name__ == "__main__":
 
     # Create figure and axis
-    fig = plt.figure(figsize=(4,3))
+    fig = plt.figure(figsize=(3, 2))
     ax = fig.add_subplot(111)
     ylabel = r"$\overline{C}_l$"
     if metric == customMetrics[0]:
         ylabel = r"$\overline{C}_d$"
     ax.set_ylabel(ylabel)
-    ax.set_xlabel(r"Time step increase $\Delta t_{CFL}$")
-    ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
-    ax.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+    # ax.set_xlabel(r"Time step increase $\Delta t_{CFL}$")
+    ax.set_xlabel(r"Time step increase $\times \Delta t$")
+    # ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
     ax.set_xscale("log")
     ax.set_yscale("linear")
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%d'))
     ax.grid(which='both', axis='both')
 
 
@@ -74,12 +79,7 @@ if __name__ == "__main__":
         case_dict = {'scheme': get_scheme(full_file_path)}
 
         # Get time step size
-        # Note that we cannot detect 4e-6 from force file
-        # because the sampling rate is set to 4e-5
-        if "quasi3d" in full_directory_path:
-            dt = 4e-6
-        else:
-            dt = get_time_step_size(full_directory_path)
+        dt = get_time_step_size(full_directory_path)
         case_dict['dt'] = dt
 
         # Get plot styling
@@ -97,9 +97,6 @@ if __name__ == "__main__":
         tmax = physTime.max()
         lowerMask = physTime >= tmax - averaging_len
         upperMask = physTime <= tmax
-        # Build mask based on time interval
-        #lowerMask = time > beginAverage
-        #upperMask = time < endAverage
         mask = (lowerMask == 1) & (upperMask == 1)
         if not np.any(mask):
             print("No data for interval = [{0}, {1}]".format(tmax - averaging_len, tmax))
@@ -129,7 +126,6 @@ if __name__ == "__main__":
 
         # Determine end of transient via mser
         mser_stride_length = 10 if dt < 5e-5 else 1
-        print(f"mser stride: {mser_stride_length}")
         intTransient = mser(metricData, physTime, stride_length=mser_stride_length)
         timeTransient = physTime.iloc[intTransient]
         print("End of transient at time {0} CTU and index {1}".format(timeTransient, intTransient))
@@ -167,16 +163,30 @@ if __name__ == "__main__":
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
         df_plot = df_stat.loc[df_stat['scheme'] == scheme]
         ax.plot(df_plot['dt'] / dtref, df_plot[f'{metric}-mean'], marker='o', label=scheme)
+        ax.errorbar(df_plot['dt'] / dtref, df_plot[f'{metric}-mean'], df_plot[f'{metric}-std'], color=scheme_color, capsize=4)
 
-    # Add +/- 1% error of semi-implicit
-    ref_scheme = 'semi-implicit'
-    if ref_scheme in df_stat['scheme'].unique():
-        df_plot = df_stat.loc[df_stat['scheme'] == ref_scheme]
-        dt_max_min = [df_stat['dt'].max() / dtref, df_stat['dt'].min() / dtref]
-        ax.fill_between(dt_max_min, y1=df_plot[f'{metric}-mean']*1.01, y2=df_plot[f'{metric}-mean']*0.99,
-                        alpha=0.2, label=rf"+/- 1\% error", color=list(TABLEAU_COLORS)[0])
+    # # Add +/- 1% error of semi-implicit
+    # ref_scheme = 'semi-implicit'
+    # if ref_scheme in df_stat['scheme'].unique():
+    #     df_plot = df_stat.loc[df_stat['scheme'] == ref_scheme]
+    #     dt_max_min = [df_stat['dt'].max() / dtref, df_stat['dt'].min() / dtref]
+    #     ax.fill_between(dt_max_min, y1=df_plot[f'{metric}-mean']*1.01, y2=df_plot[f'{metric}-mean']*0.99,
+    #                     alpha=0.2, label=rf"+/- 1\% error", color=list(TABLEAU_COLORS)[0])
 
     ax.legend(loc='best')
-    plt.savefig(savename, bbox_inches='tight')
-    print(f"Wrote file {savename}")
+
+    ## Aesthetics
+    # Set x/y-limits
+    if not xlim:
+        xlim = ax.get_xlim()
+    if not ylim:
+        ylim = ax.get_ylim()
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+    # Save data
+    plt.savefig(savename + ".pdf", bbox_inches='tight')
+    df_stat.to_csv(savename + ".csv", sep=',')
+    print(f"Wrote files {savename} as pdf and csv")
+
     plt.show()

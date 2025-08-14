@@ -6,10 +6,13 @@ from glob import glob
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('qtagg')
 import matplotlib.pyplot as plt
 
-from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, file_glob_strs, \
-    use_iterations, use_cfl, DEBUG, customMetrics
+from config import (path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, file_glob_strs, \
+    use_iterations, use_cfl, DEBUG, scaling,
+                    customMetrics)
 from utilities import get_data_frame
 
 
@@ -28,7 +31,7 @@ def adjust_info_length(step_info, cfl_info = [[]], iter_info = [[]]):
     if not len_cfl == 0:
         ratio_cfl_step = len_cfl / len_step
         io_cflsteps =  int(ratio_cfl_step / io_infosteps) if len_cfl > len_step else int(io_infosteps / ratio_cfl_step)
-    print(f"Longest list: {len_max}, io_infosteps = {io_infosteps}, io_cflsteps = {io_cflsteps}")
+    print(f"\t\tLongest list: {len_max}, io_infosteps = {io_infosteps}, io_cflsteps = {io_cflsteps}")
 
     # Adjust step_info
     # Fill unknown steps and phys_time correctly, fill unknown CPU time with nan
@@ -291,73 +294,39 @@ if __name__ == "__main__":
             df_file = pd.DataFrame()
 
             # Verbose print
-            print(f"Processing directory {directory_name}")
             full_directory_path = path_to_directories + directory_name
+            full_directory_path = full_directory_path.replace("physics", "scaling")
+            node_directories = [x for x in os.walk(full_directory_path)][0][1]  # get all Yx64 directories
+            nodes = sorted([int(x.split("x")[0]) for x in node_directories])
+            n_cpus = max([int(x.split("x")[1]) for x in node_directories])
+            print(f"Processing {full_directory_path}")
 
-            # Find and sort all available subdirs following the naming convention ctu_start_end where start and end are integers
-            subdirs = [f.path for f in os.scandir(full_directory_path) if f.is_dir() and 'ctu' in f.name]
-            if len(subdirs) == 0:
-                subdirs.append(full_directory_path + ".")  # scan root dirname as well
-                print(f"\tNo subdirectories to merge. Directly parsing this directory: {Path(subdirs[0]).parts[-1]}")
-            else:
-                subdirs = sorted(subdirs, key=lambda x: int(re.search(r'ctu_(\d+)_', x).group(1)))
-                print(f"\tFound subdirectories for merging: {[Path(subdir).parts[-1] for subdir in subdirs]}")
-
-            # Loop through all subdirectories, read files and merge all data
-            for subdir in subdirs:
-                print(f"\tProcessing sub-directory {subdir}")
-                # Skip any non-ctu directories
-                cdpath = subdir + "/"
-                # print(f"\t\tcdpath: {cdpath}")
+            for n_nodes in nodes:
+                # Create node directory path
+                node_directory_path = full_directory_path + f"{n_nodes}x{n_cpus}/"
+                print(f"\tProcessing node-directory {node_directory_path}")
 
                 # Find log file(s) in sub-directory
-                files = glob(cdpath + file_glob_str)
+                files = glob(node_directory_path + file_glob_str)
                 if len(files) == 0:
-                    print(f"WARNING. Could not find any files using glob string: {file_glob_str} on path: {cdpath}")
+                    print(f"WARNING. Could not find any files using glob string: {file_glob_str} on path: {node_directory_path}")
                     continue
                 if len(files) > 1:
-                    print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]} on path: {cdpath}")
+                    print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]} on path: {node_directory_path}")
                     process_file = files[0]
                 else:
                     process_file = files[0]
 
                 # Parse log or forces file
-                if 'log' in file_glob_str:
-                    df_file = parse_log_file(process_file)
-                elif 'fce' in file_glob_str:
-                    df_file = get_data_frame(process_file, skip_start = force_file_skip_start, skip_end = force_file_skip_end)
-                elif 'his' in file_glob_str:
-                    df_file = get_data_frame(process_file, skip_start=force_file_skip_start, skip_end=force_file_skip_end)
+                df_file = parse_log_file(process_file)
+                df_file.to_csv(node_directory_path + "log_info.csv", index=False)
 
-                # Copy initial dataframe or concatenate parsed logs
-                if df_full.empty:
-                    df_full = df_file
-                else:
-                    df_full = pd.concat([df_full, df_file], axis=0, ignore_index=True)
+                # Debug print/plot
+                if DEBUG:
+                    df_file.plot(y='phys_time', label=node_directory_path)
 
-            if df_full.empty:
-                print(f"WARNING. Could not find any files to process. Skipping files for {file_glob_str}.")
-                continue
-
-            if 'log' in file_glob_str:
-                df_full.to_csv(full_directory_path + "log_info.csv", index=False)
-            else:
-                savename = file_glob_str.replace(".", "-process.")
-                if force_file_skip_start != -1:
-                    savename = savename.replace("-process.", f"-process-overlap-{force_file_skip_start}.")
-                df_full.to_csv(full_directory_path + savename, index=False)
-
-            # Debug print/plot
-            if DEBUG:
-                # print(df_full)
-                if "TOTAL" in file_glob_str:
-                    df_full.plot(x='Time', y=customMetrics[-1], label=directory_name, kind='scatter')
-                if "log" in file_glob_str:
-                    df_full.plot(y='phys_time', label=directory_name)
-
-            # Clear memory
-            del df_full
-            del df_file
+                # Clear memory
+                del df_file
 
     # Debug print/plot
     if DEBUG:
