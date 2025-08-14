@@ -1,80 +1,81 @@
-#!/usr/bin/env  python3
+# NekPy path
+import sys
+from os.path import basename
 
+from utilities import get_label
+
+sys.path.insert(0, "/home/hwustenb/code/nektar-legacy/build-master/python")
+from NekPy.FieldUtils import *
+
+import glob
+
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
-import numpy as np
-import pandas as pd
-import os, sys, glob
+
+from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_map, ctu_len, kinvis, path_to_mesh, path_to_mesh_boundary
 
 
-CTUlen = 0.25 # main plane chord
-spanlenNpp = 0.05 # span-wise domain size
-kinvis = 1.448e-6
-
-
-showGeometry=False
-
-
-savename = "vertex-distance-"
-
-dirnames = [
-        #"3d/5bl/mesh/",
-        #"3d/8bl/mesh/",
-        #"3d/refined/mesh/",
-        #"3d/please-work/mesh/",
-        "3d/please-work/physics/implicitdt1e-4/means/",
-        #"quasi3d/james/farringdon_data/Cf/",
-        ]
-
-#ctuname = "ctu_20_30"
+showGeometry = False
 ctuname = "ctu_20_30"
-#ctuname = "ctu_172_223"
 
-fnames = [
-        #"*-surfdistance_b0.csv",
-        "mean_fields_" + ctuname + "_avg_wss_b0.csv",
-        "mean_fields_" + ctuname + "_avg_wss_b1.csv",
-        "mean_fields_" + ctuname + "_avg_wss_b2.csv",
+filenames = [
+        "mean_fields_" + ctuname + "_avg_wss",
         ]
 
-dtref = 1e-5
+savename = f"wallunits"
+savename = save_directory + savename
+
+path_to_session = path_to_directories + directory_names[0] + "means/session.xml"
+
+def extract_boundary_id(f):
+    filename = basename(f).split('.')[0]
+    boundary_name = filename.split('_')[-1]
+    bid = boundary_names.index(boundary_name)
+    return bid
 
 
+# FieldConvert calls
+def convert_fld_to_csv(f):
+    bid = extract_boundary_id(f)
+
+    field = Field(sys.argv, output_points=1, force_output=True)
+    InputModule.Create("xml", field, path_to_mesh_boundary[bid]).Run()
+    InputModule.Create("xml", field, path_to_session).Run()
+    InputModule.Create("fld", field, f).Run()
+    OutputModule.Create("csv", field, f.replace(".fld", ".csv")).Run()
 
 
-def getlabel(casestr, color, dt=0.0):
-    # Build case specific label for plots
-    label = ""
-    marker = "."
-    mfc='None'
-    ls='solid'
-    color = color
+def get_csv_file(path_to_file):
 
-    # Add time step size
-    if dt == 0.0:
-        label += ""
-    elif dt < dtref:
-        label += "${0:.1f}$".format(
-                round(dt/dtref,1)
-                )
-        label += "$ \Delta t_{CFL}$"
+    csvfile = ""
+
+    # Glob for files
+    path_to_all_files = glob.glob(path_to_file + "*")
+
+    # Remove slicer outputs
+    path_to_all_files = [p for p in path_to_all_files if not "slicey" in p]
+
+    if len(path_to_all_files) == 0:
+        print("Did not find csv file but found {0}".format(path_to_file))
+        return ""
+    elif len(path_to_all_files) > 0:
+        print("Found files {0}".format(path_to_all_files))
+        # First look for csv file
+        for filepath in path_to_all_files:
+            if filepath.endswith(".csv"):
+                return filepath
+        # If no csv file, try converting a fld file
+        for filepath in path_to_all_files:
+            if filepath.endswith(".fld"):
+                print("Converting {0} to csv".format(basename(filepath)))
+                convert_fld_to_csv(filepath)
+                return filepath.replace(".fld", ".csv")
+            else:
+                print("Found file {0}. Nothing to do. Continue looking..".format(basename(filepath)))
     else:
-        label += "${0:d}$".format(
-                int(round(dt/dtref))
-                )
-        label += "$ \Delta t_{CFL}$"
-
-    if "5bl" in casestr:
-        label += " Mesh A"
-    elif "8bl" in casestr:
-        label += " Mesh B"
-    elif "refined" in casestr:
-        label += " Mesh C"
-    elif "please-work" in casestr:
-        label += " Mesh D"
-
-
-    return label, marker, mfc, ls, color
+        return path_to_all_files[0]
 
 
 
@@ -110,8 +111,11 @@ def compute_closest_point(row, df_coords):
     return pd.Series([xplus, yplus, zplus])
 
 
+
+
 if __name__ == "__main__":
 
+    # Create figures
     figx = plt.figure(figsize=(7,4))
     axx = figx.add_subplot(111)
     figy = plt.figure(figsize=(7,4))
@@ -119,81 +123,91 @@ if __name__ == "__main__":
     figz = plt.figure(figsize=(7,4))
     axz = figz.add_subplot(111)
 
-    for dname, color in zip(dirnames, TABLEAU_COLORS):
-        xorigin = 0
-        for fname in fnames:
-            f = glob.glob(dname + fname)
-            print("f", f)
-            if not len(f) == 1:
-                print("Did not find file in {0}".format(dname + fname))
-                continue
-            else:
-                f = f[0]
+    for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
+        # Setup paths
+        full_directory_path = path_to_directories + dirname
+        for filename in filenames:
+            file_path = full_directory_path + filename
+            label = get_label(file_path)
+            label = label[0] # ignore all other returns
 
-            label, marker, mfc, ls, color = getlabel(f, color)
-            print("Processing {0}".format(label))
+            # Loops all wing elements (boundaries)
+            xorigin = 0
+            for bname, b_color in zip(boundary_names, TABLEAU_COLORS):
+                # Get csv file for wss
+                boundary_file_path = file_path + "_" + bname
+                wss_file = get_csv_file(boundary_file_path)
 
-            # Read dataframes
-            df_wss = pd.read_csv(f, sep=',', engine='python', skiprows=0)
-            surfdist_file = "mesh-surfdistance.csv"
-            if "b0" in f:
-                surfdist_file = surfdist_file.replace(".csv", "_b0.csv")
-            elif "b1" in f:
-                surfdist_file = surfdist_file.replace(".csv", "_b1.csv")
-            elif "b2" in f:
-                surfdist_file = surfdist_file.replace(".csv", "_b2.csv")
+                # Skip if no file found
+                if wss_file == "":
+                    continue
 
-            df_surf = pd.read_csv(dname + f"../../../mesh/{surfdist_file}", sep=',', engine='python', skiprows=0)
+                # Read dataframe
+                df_wss = pd.read_csv(wss_file, sep=',', engine='python', skiprows=0)
 
-            df = pd.concat([df_wss, df_surf['dist']], axis=1)
+                # Get csv file for surfdist
+                surfdist_file = "mesh-surfdistance_{0}".format(bname)
+                surfdist_file_path = path_to_mesh.replace("mesh.xml", surfdist_file)
+                surfdist_file = get_csv_file(surfdist_file_path)
 
-            # Rename columns
-            if 'Points:0' in df.columns:
-                df.rename(columns={"Points:0": "x", "Points:1": "y", "Points:2": "z"}, inplace=True)
-            if 'x' in df.columns or 'y' in df.columns:
-                df.rename(columns={"# x": "x", "y": "y", "z": "z"}, inplace=True)
+                # Skip if no file found
+                if surfdist_file_path == "":
+                    continue
 
-            # Set origin to zero
-            if xorigin == 0:
-                xorigin = df['x'].min()
-            df['x'] = df['x'] - xorigin # Set origin to zero
-            print("xorigin:", xorigin)
+                # Read dataframe
+                df_surf = pd.read_csv(surfdist_file, sep=',', engine='python', skiprows=0)
 
+                # Concatenate wss and surfdistance
+                df = pd.concat([df_wss, df_surf['dist']], axis=1)
 
-            if showGeometry:
-                axx.scatter(df['x'] / CTUlen, df['y'] / CTUlen, marker='o', label=label + ' x-y plane')
-                axy.scatter(df['y'] / CTUlen, df['z'] / CTUlen, marker='o', label=label + ' y-z plane')
-                axz.scatter(df['x'] / CTUlen, df['z'] / CTUlen, marker='o', label=label + ' x-z plane')
-            else:
-                # Create an empty DataFrame to store the results
-                df_result = pd.DataFrame(index=df.index)
+                # Rename columns
+                if 'Points:0' in df.columns:
+                    df.rename(columns={"Points:0": "x", "Points:1": "y", "Points:2": "z"}, inplace=True)
+                if 'x' in df.columns or 'y' in df.columns:
+                    df.rename(columns={"# x": "x", "y": "y", "z": "z"}, inplace=True)
 
-                # Apply the function row-wise to compute xplus and zplus
-                df_result[['xplus', 'yplus', 'zplus']] = df.apply(compute_closest_point, axis=1, df_coords=df)
+                # Set origin to zero (only for first boundary)
+                if xorigin == 0:
+                    xorigin = df['x'].min()
+                df['x'] = df['x'] - xorigin # Set origin to zero
+                print("xorigin:", xorigin)
 
-                # Visualise
-                axx.scatter(df['x'] / CTUlen, df_result['xplus'], marker='o', label=label + ' xplus')
-                axy.scatter(df['x'] / CTUlen, df_result['yplus'], marker='o', label=label + ' yplus')
-                axz.scatter(df['x'] / CTUlen, df_result['zplus'], marker='o', label=label + ' zplus')
+                if showGeometry:
+                    axx.scatter(df['x'] / ctu_len, df['y'] / ctu_len, marker='o', label=label + ' x-y plane')
+                    axy.scatter(df['y'] / ctu_len, df['z'] / ctu_len, marker='o', label=label + ' y-z plane')
+                    axz.scatter(df['x'] / ctu_len, df['z'] / ctu_len, marker='o', label=label + ' x-z plane')
+                else:
+                    # Create an empty DataFrame to store the results
+                    df_result = pd.DataFrame(index=df.index)
 
-                df_out = pd.concat([df, df_result], axis=1)
+                    # Apply the function row-wise to compute xplus and zplus
+                    df_result[['xplus', 'yplus', 'zplus']] = df.apply(compute_closest_point, axis=1, df_coords=df)
 
-                df_out.to_csv(f.replace("wss", "wallunits"), sep=' ', index=False)
+                    # Visualise
+                    axx.scatter(df['x'] / ctu_len, df_result['xplus'], marker='o', label=label + ' xplus')
+                    axy.scatter(df['x'] / ctu_len, df_result['yplus'], marker='o', label=label + ' yplus')
+                    axz.scatter(df['x'] / ctu_len, df_result['zplus'], marker='o', label=label + ' zplus')
 
-    if not showGeometry:
-        axx.set_yscale("log")
-        axy.set_yscale("log")
-        axz.set_yscale("log")
-    axx.legend()
-    axy.legend()
-    axz.legend()
-    axx.grid()
-    axy.grid()
-    axz.grid()
+                    df_out = pd.concat([df, df_result], axis=1)
 
-    figx.savefig(savename + "-xplus.png", bbox_inches="tight")
-    figy.savefig(savename + "-yplus.png", bbox_inches="tight")
-    figz.savefig(savename + "-zplus.png", bbox_inches="tight")
+                    df_out.to_csv(boundary_file_path.replace("wss", "wallunits"), sep=' ', index=False)
+                    print("Written {0}".format(boundary_file_path.replace("wss", "wallunits")))
 
-    plt.show()
+        if not showGeometry:
+            axx.set_yscale("log")
+            axy.set_yscale("log")
+            axz.set_yscale("log")
+        axx.legend()
+        axy.legend()
+        axz.legend()
+        axx.grid()
+        axy.grid()
+        axz.grid()
+
+        figx.savefig(savename + "-xplus.png", bbox_inches="tight")
+        figy.savefig(savename + "-yplus.png", bbox_inches="tight")
+        figz.savefig(savename + "-zplus.png", bbox_inches="tight")
+
+        plt.show()
+
 
