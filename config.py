@@ -25,21 +25,21 @@ if case == 'eifw':
 
     directory_names = [
         # "quasi3d/james/farringdon_data/",
-        "3d/please-work/physics/semiimplicit/dt1e-5/",
+        # "3d/please-work/physics/semiimplicit/dt1e-5/",
         # "3d/please-work/physics/semiimplicit/dt1e-5-kinvis/",
         # "3d/please-work/physics/semiimplicit/dt1e-5/animation_280_285/",
-        "3d/please-work/physics/linearimplicit/dt1e-5/",
+        # "3d/please-work/physics/linearimplicit/dt1e-5/",
         # "3d/please-work/physics/linearimplicit/dt5e-5/",
-        # "3d/please-work/physics/linearimplicit/dt1e-4/",
+        "3d/please-work/physics/linearimplicit/dt1e-4/",
         # "3d/please-work/physics/linearimplicit/dt2e-4/",
         # "3d/please-work/physics/linearimplicit/dt5e-4/",
         # "3d/please-work/physics/linearimplicit/dt1e-3/",
-        "3d/please-work/physics/substepping/dt1e-5/",
+        # "3d/please-work/physics/substepping/dt1e-5/",
         # "3d/please-work/physics/substepping/dt5e-5/",
         # "3d/please-work/physics/substepping/dt1e-4/",
         # "3d/please-work/physics/substepping/dt2e-4/",
         # # "3d/please-work/physics/linearimplicit-strong/dt1e-4/",
-        ]
+    ]
 
     # Skip initial or final n points for each (individual/subdir!) force file
     # Note that a small overlap removes the pressure kick after restarting
