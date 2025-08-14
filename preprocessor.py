@@ -8,8 +8,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from config import path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, file_glob_strs, \
-    use_iterations, use_cfl, DEBUG, customMetrics
+from config import (
+    path_to_directories,
+    directory_names,
+    force_file_skip_start,
+    force_file_skip_end,
+    force_file_glob_strs,
+    history_file_glob_strs,
+    log_file_glob_str,
+    use_iterations,
+    use_cfl,
+    DEBUG,
+    customMetrics,
+)
 from utilities import get_data_frame
 
 
@@ -282,8 +293,11 @@ def test_parse_log_file():
 # TODO extend this for History point files (justify time-averaging windows)
 # TODO extend this for Energy (3D) files
 if __name__ == "__main__":
-    # Loop all possible files (logs, force, ..)
-    for file_glob_str in file_glob_strs:
+    # Combine log, force and history file patterns
+    all_file_glob_strs = [log_file_glob_str, *force_file_glob_strs, *history_file_glob_strs]
+
+    # Loop all possible files (logs, force, history, ...)
+    for file_glob_str in all_file_glob_strs:
         # Loop all directories (cases)
         for directory_name in directory_names:
             # Create empty dataframe for this file(-type)
@@ -321,13 +335,27 @@ if __name__ == "__main__":
                 else:
                     process_file = files[0]
 
-                # Parse log or forces file
+                # Parse log, force or history file
                 if 'log' in file_glob_str:
                     df_file = parse_log_file(process_file)
-                elif 'fce' in file_glob_str:
-                    df_file = get_data_frame(process_file, skip_start = force_file_skip_start, skip_end = force_file_skip_end)
-                elif 'his' in file_glob_str:
-                    df_file = get_data_frame(process_file, skip_start=force_file_skip_start, skip_end=force_file_skip_end)
+                elif file_glob_str.endswith('.fce'):
+                    df_file = get_data_frame(
+                        process_file,
+                        skip_start=force_file_skip_start,
+                        skip_end=force_file_skip_end,
+                    )
+                elif file_glob_str.endswith('.his'):
+                    df_file = get_data_frame(
+                        process_file,
+                        skip_start=force_file_skip_start,
+                        skip_end=force_file_skip_end,
+                    )
+                else:
+                    df_file = get_data_frame(
+                        process_file,
+                        skip_start=force_file_skip_start,
+                        skip_end=force_file_skip_end,
+                    )
 
                 # Copy initial dataframe or concatenate parsed logs
                 if df_full.empty:

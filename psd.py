@@ -13,14 +13,24 @@ import pandas as pd
 from scipy.signal import welch
 
 from utilities import get_time_step_size, get_label, mser, filter_time_interval, check_sampling_rates
-from config import directory_names, path_to_directories, dtref, \
-    customMetrics, ref_area, ctu_len, ref_velocity, save_directory, file_glob_strs, force_file_skip_start
+from config import (
+    directory_names,
+    path_to_directories,
+    dtref,
+    customMetrics,
+    ref_area,
+    ctu_len,
+    ref_velocity,
+    save_directory,
+    force_file_glob_strs,
+    force_file_skip_start,
+)
 
 ####### SCRIPT USER INPUTS
 # Choose lift or drag
 metric = customMetrics[1]
 
-forces_file = file_glob_strs[1]
+forces_file = force_file_glob_strs[0]
 averaging_len = 10.1 # [CTU] redundant due to MSER, just use large number
 
 n_downsample = 2

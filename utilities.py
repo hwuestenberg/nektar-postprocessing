@@ -1,6 +1,7 @@
 #!/usr/bin/env  python3
 import os, sys, subprocess, re
 from glob import glob
+from pathlib import Path
 import numpy as np
 import pandas
 import pandas as pd
@@ -48,8 +49,16 @@ def get_ctu_names(glob_string, descending=False):
 
 
 def get_data_frame(filename, skip_start = 0, skip_end = 0):
-    # Check file type
-    file_type = "." + filename.split('.')[-1]
+    """Read force or history point data into a DataFrame.
+
+    The file type is determined from the suffix.  History point files
+    (``.his``) are treated differently from force files (``.fce``) since the
+    former contain multiple points per time step.  All other extensions are
+    handled like force files.
+    """
+
+    # Detect file type from suffix
+    file_type = Path(filename).suffix
 
     # Pre-read file and check for 2D/3D
     headerskip = 0

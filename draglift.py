@@ -14,8 +14,16 @@ import pandas as pd
 from scipy.signal import savgol_filter
 
 from utilities import get_time_step_size, get_label, mser, plot_cumulative_mean_std, filter_time_interval
-from config import directory_names, path_to_directories, \
-    customMetrics, ref_area, ctu_len, save_directory, force_file_skip_start, file_glob_strs
+from config import (
+    directory_names,
+    path_to_directories,
+    customMetrics,
+    ref_area,
+    ctu_len,
+    save_directory,
+    force_file_skip_start,
+    force_file_glob_strs,
+)
 
 
 ############################
@@ -24,7 +32,7 @@ from config import directory_names, path_to_directories, \
 # Choose lift [1] or drag [0]
 metric = customMetrics[1]
 
-forces_file = file_glob_strs[1]
+forces_file = force_file_glob_strs[0]
 # forces_file = "DragLift.fce"
 ctu_skip = 100 # sort of redundant with MSER
 use_mser = True
