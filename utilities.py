@@ -108,7 +108,11 @@ def get_time_step_size(directory_name):
     # Get time/step info for x-axis
     phystime = dftime["phys_time"].to_numpy()
     steps = dftime["steps"].to_numpy()
-    dt = (phystime[10] - phystime[0]) / (steps[10] - steps[0]) # Get time step size
+
+    # Use the entire available range instead of assuming at least 11 entries.
+    # This avoids an IndexError for short log files and yields a robust average
+    # time step size.
+    dt = (phystime[-1] - phystime[0]) / (steps[-1] - steps[0])
     return dt
 
 
