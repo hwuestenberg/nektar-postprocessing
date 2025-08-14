@@ -19,7 +19,6 @@ from config import directory_names, path_to_directories, save_directory, boundar
 
 showGeometry = False
 ctuname = "ctu_20_30"
-
 filenames = [
         "mean_fields_" + ctuname + "_avg_wss",
         ]
