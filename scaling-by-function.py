@@ -16,8 +16,17 @@ import os
 from glob import glob
 
 from utilities import get_time_step_size, mser, get_label, get_scheme
-from config import directory_names, path_to_directories, dtref, \
-    customMetrics, ref_area, ctu_len, divtol, force_file_skip_start, save_directory, file_glob_strs
+from config import (
+    directory_names,
+    path_to_directories,
+    dtref,
+    customMetrics,
+    ref_area,
+    ctu_len,
+    divtol,
+    force_file_skip_start,
+    save_directory,
+)
 
 
 

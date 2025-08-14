@@ -10,9 +10,18 @@ import matplotlib
 matplotlib.use('qtagg')
 import matplotlib.pyplot as plt
 
-from config import (path_to_directories, directory_names, force_file_skip_start, force_file_skip_end, file_glob_strs, \
-    use_iterations, use_cfl, DEBUG, scaling,
-                    customMetrics)
+from config import (
+    path_to_directories,
+    directory_names,
+    force_file_skip_start,
+    force_file_skip_end,
+    log_file_glob_str,
+    use_iterations,
+    use_cfl,
+    DEBUG,
+    scaling,
+    customMetrics,
+)
 from utilities import get_data_frame
 
 
@@ -285,7 +294,9 @@ def test_parse_log_file():
 # TODO extend this for History point files (justify time-averaging windows)
 # TODO extend this for Energy (3D) files
 if __name__ == "__main__":
-    # Loop all possible files (logs, force, ..)
+    # Only log files are needed for scaling analysis
+    file_glob_strs = [log_file_glob_str]
+
     for file_glob_str in file_glob_strs:
         # Loop all directories (cases)
         for directory_name in directory_names:

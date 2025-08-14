@@ -10,14 +10,16 @@ scaling = True
 if case == 'eifw':
 
     # Walk through directories and merge files
-    file_glob_strs = [
-        'log.*',
+    log_file_glob_str = 'log.*'
+    force_file_glob_strs = [
         # 'FWING_TOTAL_forces.fce',
         # 'LFW_fia_mp_forces.fce',
         # 'LFW_element_1_forces.fce',
         # 'LFW_element_2_forces.fce',
-        # 'mainplane_spanwise.his'
-        # "mainplane-suction-midplane.his"
+    ]
+    history_file_glob_strs = [
+        # 'mainplane_spanwise.his',
+        # "mainplane-suction-midplane.his",
     ]
 
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
@@ -82,13 +84,14 @@ if case == 'eifw':
 elif case == '2difw':
 
     # Walk through directories and merge files
-    file_glob_strs = [
-        'log*',
+    log_file_glob_str = 'log*'
+    force_file_glob_strs = [
         'FWING_TOTAL_forces.fce',
         'LFW_fia_mp_forces.fce',
         'LFW_element_1_forces.fce',
         'LFW_element_2_forces.fce',
     ]
+    history_file_glob_strs = []
 
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/2d/hx1/physics/"
     save_directory = "/home/henrik/Documents/simulation_data/gjp-figures/"
@@ -140,10 +143,9 @@ elif case == '2difw':
 
 #### CONFIG FOR 2D cylinder ####
 elif case == '2dcyl':
-    file_glob_strs = [
-        'log*',
-        'DragLift.fce',
-    ]
+    log_file_glob_str = 'log*'
+    force_file_glob_strs = ['DragLift.fce']
+    history_file_glob_strs = []
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/cylinder/2d/hx1/physics/"
 
     directory_names = [
@@ -154,6 +156,9 @@ elif case == '2dcyl':
 
 #### CONFIG FOR minimal test ####
 elif case == 'minimal':
+    log_file_glob_str = 'log*'
+    force_file_glob_strs = []
+    history_file_glob_strs = []
     path_to_directories = "/home/henrik/Documents/simulation_data/"
     directory_names = [
         "test_files/"
@@ -163,10 +168,9 @@ elif case == 'minimal':
 
 # #### CONFIG FOR channel flow ####
 elif case == 'channel':
-    file_glob_strs = [
-        'log*',
-        'DragLift.fce',
-    ]
+    log_file_glob_str = 'log*'
+    force_file_glob_strs = ['DragLift.fce']
+    history_file_glob_strs = []
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/channel/physics/ret180/kmm-setup/"
     save_directory = "/home/henrik/Documents/simulation_data/codeVerification/channel/physics/"
 
@@ -228,11 +232,9 @@ elif case == 'channel':
 #### CONFIG FOR taylor-green vortex ####
 elif case == 'tgv':
 
-    file_glob_strs = [
-        'log*',
-        '*.eny',
-        'box.his',
-    ]
+    log_file_glob_str = 'log*'
+    force_file_glob_strs = []
+    history_file_glob_strs = ['*.eny', 'box.his']
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/taylorgreenvortex/"
     save_directory = "/home/henrik/Documents/simulation_data/codeVerification/taylorgreenvortex/figures/"
 

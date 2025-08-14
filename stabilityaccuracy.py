@@ -11,13 +11,23 @@ import numpy as np
 import pandas as pd
 
 from utilities import get_time_step_size, mser, get_label, get_scheme
-from config import directory_names, path_to_directories, dtref, \
-    customMetrics, ref_area, ctu_len, divtol, force_file_skip_start, save_directory, file_glob_strs
+from config import (
+    directory_names,
+    path_to_directories,
+    dtref,
+    customMetrics,
+    ref_area,
+    ctu_len,
+    divtol,
+    force_file_skip_start,
+    save_directory,
+    force_file_glob_strs,
+)
 
 
 # Choose lift [1] or drag [0]
 metric = customMetrics[0]
-forces_file = file_glob_strs[1]
+forces_file = force_file_glob_strs[0]
 
 averaging_len = 30 # [CTU] redundant due to MSER, just use large number
 n_downsample = 2
