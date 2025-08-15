@@ -17,7 +17,6 @@ filenames = [
         "mean_fields_" + ctuname + "_avg_wallunits",
         ]
 
-
 global_xlim = [-0.05, 1.05]
 savename = f"wallunits"
 savename = save_directory + savename
