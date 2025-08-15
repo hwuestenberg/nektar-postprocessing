@@ -17,6 +17,7 @@ filenames = [
         "mean_fields_" + ctuname + "_avg_wallunits",
         ]
 
+global_xlim = [-0.05, 1.05]
 savename = f"wallunits"
 savename = save_directory + savename
 
@@ -24,11 +25,15 @@ savename = save_directory + savename
 if __name__ == "__main__":
 
     # Create figures
-    figs = list()
+    # figs = list()
+    fig = plt.figure(figsize=(6, 6))
     axs = list()
-    for bname in boundary_names:
-        figs.append(plt.figure(figsize=(6,2)))
-        axs.append(figs[-1].add_subplot(111))
+    for i in range(0,3):
+        # figs.append(plt.figure(figsize=(6,2)))
+        if i == 0:
+            axs.append(fig.add_subplot(3, 1, i+1))
+        else:
+            axs.append(fig.add_subplot(3, 1, i+1, sharex=axs[0]))
 
     for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
         # Setup paths
@@ -61,12 +66,13 @@ if __name__ == "__main__":
                 variables = ["xplus", "yplus", "zplus"]
                 for ax, var in zip(axs, variables):
                     wallunit = np.abs(df[var]) / 4
-                    ax.plot(x, wallunit, marker='o', linestyle='', markeredgewidth=1.0, color=b_color, label=label)#, alpha=0.8)
+                    ax.plot(x, wallunit, marker='o', linestyle='', markeredgewidth=1.0, color=b_color, label=label, alpha=0.5)
 
         for ax in axs:
             ax.set_xlabel("$x/c$")
             ax.set_yscale("log")
 
+            ax.set_xlim(global_xlim)
             xmin, xmax = ax.get_xlim()
             ymin, ymax = ax.get_ylim()
 
@@ -78,12 +84,22 @@ if __name__ == "__main__":
                 ax.plot([xmin, xmax], [50, 50], '-r')
                 ax.text(xmax*0.9, 50*1.1, "$\Delta x^+ limit$")
                 ax.fill_between([xmin, xmax], y1=50, y2=150, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
+                ax.set_ylim([1e0, 3e2])
+
+                # Hide xtick labels on all but the bottom-most axis
+                ax.tick_params(axis='x', which='both', labelbottom=False)
+                ax.set_xlabel("")
+
             elif ax == axs[1]:
                 ax.set_ylabel("$\Delta z^+$")
                 # Set y^+ = 1 limit bar
                 ax.plot([xmin, xmax], [1, 1], '-r')
                 ax.text(xmax*0.9, 1*1.1, "$\Delta z^+ limit$")
                 ax.fill_between([xmin, xmax], y1=1*0.9, y2=1*1.1, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
+
+                # Hide xtick labels on all but the bottom-most axis
+                ax.tick_params(axis='x', which='both', labelbottom=False)
+                ax.set_xlabel("")
             elif ax == axs[2]:
                 ax.set_ylabel("$\Delta y^+$")
                 # Set z^+ = 15 limit bar
@@ -92,12 +108,28 @@ if __name__ == "__main__":
                 ax.text(xmax*0.9, 15, "$\Delta y^+ limit$")
                 ax.fill_between([xmin, xmax], y1=15, y2=40, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
             #ax.set_ylim([1e-4, ymax])
-            ax.legend(loc='lower right')
+            # Removed per-axis legend to avoid covering data
+            # ax.legend(loc='lower right')
             ax.grid()
 
+    # Build a single, figure-level legend below the axes
+    # Collect unique handles/labels from all axes to avoid duplicates
+    handles_all, labels_all = [], []
+    for ax in axs:
+        h, l = ax.get_legend_handles_labels()
+        for hh, ll in zip(h, l):
+            if ll not in labels_all:
+                labels_all.append(ll)
+                handles_all.append(hh)
+
+    # Reserve bottom space and place the legend centered below the subplots
+    fig.subplots_adjust(bottom=0.2)
+    fig.legend(handles_all, labels_all, loc='lower center', ncol=min(4, len(labels_all)), bbox_to_anchor=(0.5, 0.05))
+
     if savename:
-        for fig, bname in zip(figs, boundary_names):
-            fig.savefig(savename + "-" + bname.replace(".csv","") + ".png", bbox_inches="tight")
+        fig.savefig(savename + "-" + ".png", bbox_inches="tight")
+        # for fig, bname in zip(figs, boundary_names):
+        #     fig.savefig(savename + "-" + bname.replace(".csv","") + ".png", bbox_inches="tight")
             #fig.savefig(savename + ".pdf", bbox_inches="tight")
 
     #ax.set_xlim([0.33, 0.79])
@@ -108,4 +140,3 @@ if __name__ == "__main__":
 
 
     plt.show()
-
