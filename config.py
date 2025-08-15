@@ -25,6 +25,14 @@ if case == 'eifw':
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
     save_directory = "/home/henrik/Documents/simulation_data/cpc-figures/"
 
+    path_to_mesh = path_to_directories + "mesh/mesh.xml"
+    # Order must follow boundary_names below
+    path_to_mesh_boundary = [
+        path_to_directories + "mesh/mesh_b5.xml",
+        path_to_directories + "mesh/mesh_b6.xml",
+        path_to_directories + "mesh/mesh_b7.xml",
+    ]
+
     directory_names = [
         # "quasi3d/james/farringdon_data/",
         # "3d/please-work/physics/semiimplicit/dt1e-5/",
@@ -56,11 +64,12 @@ if case == 'eifw':
     customMetrics = ["F1-total", "F3-total"]#, "F2-total", "F3-total"]
 
     # Characteristic velocity and lengths
-    ref_velocity = 1.0 # non-dimensional velocity [m/s]
+    ref_velocity = 1.0 # non-dimensional velocity [ms]
     chord_length = 0.25 # mainplane chord [m]
     ctu_len = chord_length / ref_velocity # [s]
     spanlen_npp = 0.05 # spanwise length for extruded IFW [m]
     ref_area = ctu_len * spanlen_npp # reference area
+    kinvis = 1.448e-6
 
     # reference time step size (CFL ~= 1)
     dtref = 1e-5
@@ -77,6 +86,12 @@ if case == 'eifw':
         "b1",
         "b2",
     ]
+
+    boundary_map = {
+        'b0' : 5,
+        'b1' : 6,
+        'b2' : 7,
+    }
 
 
 
