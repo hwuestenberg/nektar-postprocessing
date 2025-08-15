@@ -87,6 +87,12 @@ if case == 'eifw':
         "b2",
     ]
 
+    boundary_names_plot = [
+        "Main plane",
+        "1st Flap",
+        "2nd Flap",
+    ]
+
     boundary_map = {
         'b0' : 5,
         'b1' : 6,
