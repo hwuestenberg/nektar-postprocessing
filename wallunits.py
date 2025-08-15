@@ -24,11 +24,15 @@ savename = save_directory + savename
 if __name__ == "__main__":
 
     # Create figures
-    figs = list()
+    # figs = list()
+    fig = plt.figure(figsize=(6, 6))
     axs = list()
-    for bname in boundary_names:
-        figs.append(plt.figure(figsize=(6,2)))
-        axs.append(figs[-1].add_subplot(111))
+    for i, bname in enumerate(boundary_names):
+        # figs.append(plt.figure(figsize=(6,2)))
+        if bname == boundary_names[0]:
+            axs.append(fig.add_subplot(3, 1, i+1))
+        else:
+            axs.append(fig.add_subplot(3, 1, i+1, sharex=axs[0]))
 
     for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
         # Setup paths
@@ -78,6 +82,7 @@ if __name__ == "__main__":
                 ax.plot([xmin, xmax], [50, 50], '-r')
                 ax.text(xmax*0.9, 50*1.1, "$\Delta x^+ limit$")
                 ax.fill_between([xmin, xmax], y1=50, y2=150, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
+                ax.set_ylim([1e0, 3e2])
             elif ax == axs[1]:
                 ax.set_ylabel("$\Delta z^+$")
                 # Set y^+ = 1 limit bar
@@ -96,8 +101,9 @@ if __name__ == "__main__":
             ax.grid()
 
     if savename:
-        for fig, bname in zip(figs, boundary_names):
-            fig.savefig(savename + "-" + bname.replace(".csv","") + ".png", bbox_inches="tight")
+        fig.savefig(savename + "-" + ".png", bbox_inches="tight")
+        # for fig, bname in zip(figs, boundary_names):
+        #     fig.savefig(savename + "-" + bname.replace(".csv","") + ".png", bbox_inches="tight")
             #fig.savefig(savename + ".pdf", bbox_inches="tight")
 
     #ax.set_xlim([0.33, 0.79])
