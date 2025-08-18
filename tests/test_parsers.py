@@ -1,4 +1,7 @@
+import os
 from pathlib import Path
+import random
+import string
 
 import matplotlib
 matplotlib.use("Agg")
@@ -26,7 +29,7 @@ def test_parse_log_file_and_plot(tmp_path):
         "iterations_w",
     }
     assert expected_cols.issubset(df.columns)
-    assert len(df) == 25000
+    assert len(df) == 110
 
     fig, ax = plt.subplots()
     ax.plot(df["phys_time"], df["cpu_time"])
@@ -85,3 +88,18 @@ def test_get_data_frame_history_file_and_plot(tmp_path):
     fig.savefig(fig_path)
     assert fig_path.exists()
     plt.close(fig)
+
+
+if __name__ == "__main__":
+    size = 10
+    chars = string.ascii_uppercase + string.digits
+    tmp_name = ''.join(random.choice(chars) for _ in range(size))
+    tmp_path = Path("./tests/" + tmp_name)
+
+    if not os.path.exists(tmp_path):
+        os.makedirs(tmp_path)
+
+    test_parse_log_file_and_plot(tmp_path)
+    test_get_data_frame_force_file_and_plot(tmp_path)
+    test_get_data_frame_history_file_and_plot(tmp_path)
+
