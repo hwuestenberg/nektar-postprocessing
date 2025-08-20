@@ -71,7 +71,8 @@ def adjust_info_length(step_info, cfl_info = [[]], iter_info = [[]]):
             # Updated phys_time
             dt = (step_info[1][1] - step_info[1][0]) / (io_infosteps)
             initial_phys_time = step_info[1][0] - io_infosteps * dt
-            print(f"dt = {dt}, initial_phys_time = {initial_phys_time}")
+            final_phys_time = step_info[1][-1]
+            print(f"dt = {dt}, initial_phys_time = {initial_phys_time}, final_phys_time = {final_phys_time}, durations = {final_phys_time - initial_phys_time}")
             new_step_info.append(
                 [initial_phys_time + i * dt for i in range(len_max)]
             )
