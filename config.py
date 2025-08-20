@@ -10,16 +10,26 @@ scaling = True
 if case == 'eifw':
 
     # Walk through directories and merge files
-    log_file_glob_str = 'log.*'
+    log_file_glob_str = 'log*'
     force_file_glob_strs = [
-        # 'FWING_TOTAL_forces.fce',
-        # 'LFW_fia_mp_forces.fce',
-        # 'LFW_element_1_forces.fce',
-        # 'LFW_element_2_forces.fce',
+        'FWING_TOTAL_forces.fce',
+        'LFW_fia_mp_forces.fce',
+        'LFW_element_1_forces.fce',
+        'LFW_element_2_forces.fce',
     ]
     history_file_glob_strs = [
         # 'mainplane_spanwise.his',
-        # "mainplane-suction-midplane.his",
+        'mainplane_streamwise.his',
+        "mainplane-suction-midplane.his",
+        # 'flap1_spanwise.his',
+        # 'flap1_streamwise.his',
+        # 'flap2_spanwise_pressure.his',
+        # 'flap2_spanwise_suction.his',
+        # 'flap2_streamwise.his',
+        # 'wake_0_15.his',
+        # 'wake_0_225.his',
+        # 'wake_0_35.his',
+        # 'wake_0_65.his',
     ]
 
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work/physics/archer2/"
