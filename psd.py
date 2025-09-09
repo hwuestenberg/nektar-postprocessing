@@ -42,14 +42,14 @@ ref_freq = [21, 29, 40]#, 60, 140, 200]
 # Welch parameters
 use_welch = True
 overlap = 2
-windows = 4
+windows = 8
 
-xlim = []
+xlim = [5e-1, 2e3]
 ylim = [1e-4, 1e4]
 
-savename = f"PSD-dt-{metric}-{forces_file.split('.')[0]}"
+# savename = f"PSD-dt-{metric}-{forces_file.split('.')[0]}"
 # savename = f"PSD-scheme-{metric}-{forces_file.split('.')[0]}"
-# savename = f"PSD-james-{metric}-{forces_file.split('.')[0]}"
+savename = f"PSD-james-{metric}-{forces_file.split('.')[0]}"
 savename = save_directory + savename
 
 
@@ -162,7 +162,7 @@ if __name__ == "__main__":
             nperseg = round(float(signal.shape[0]) / windows)  # Dividing the length of the sample
             freq_welch, psd_welch = welch(signal, fs=f_sample, nperseg=nperseg)#, noverlap=overlap)
             # label = "Welch " + label
-            ax.plot(freq_welch, psd_welch / psd_welch[0], label=label, linestyle=ls, color=dir_color)
+            ax.plot(freq_welch, psd_welch / psd_welch[0], label=label, linestyle=ls, color=color)
 
         # Compute FFT directly
         # Note need to compute PSD via abs()**2
@@ -186,7 +186,7 @@ if __name__ == "__main__":
 
     # Print reference -5/3 slope
     xlim = np.array([1e2, 1e3])
-    points =  xlim**(-5/3) * 1e5
+    points =  xlim**(-5/3) * 1e6
     ax.plot(xlim, points, label='Reference -5/3', linestyle='dashed', color='black')
     # xlim = np.array([1e2, 5e2])
     # points =  xlim**(-30/3) * 1e22
