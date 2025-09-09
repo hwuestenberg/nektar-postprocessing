@@ -2,6 +2,10 @@
 
 import os, glob, subprocess
 
+import sys
+sys.path.insert(0, "/home/henrik/code/nektar-animation/build-master/python")
+from NekPy.FieldUtils import *
+
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
 params = {'text.usetex': True,
@@ -13,17 +17,18 @@ from matplotlib.colors import TABLEAU_COLORS
 import numpy as np
 import pandas as pd
 
-from scipy.interpolate import griddata
-import alphashape
+from utilities import get_time_step_size, get_label, get_ctu_names, extract_boundary_id
+from config import directory_names, path_to_directories, ctu_len, boundary_names, save_directory, path_to_mesh_boundary, \
+    boundary_names_long
 
-from utilities import get_time_step_size, get_label, get_ctu_names
-from config import directory_names, path_to_directories, ctu_len, boundary_names, save_directory
+surf_variable = 'cf'
+wss_variable = 'Shear_mag'
+
+# plot only part of the surfaces
+boundary_names = boundary_names[0:1]
 
 
-
-surf_variable = 'cp'
-
-savename = f"surface-convergence-{surf_variable}"
+savename = f"surface-james-{surf_variable}"
 savename = save_directory + savename
 
 
@@ -34,11 +39,25 @@ var_extension = ''
 if surf_variable == "cf":
     var_extension = 'wss_'
 
-wss_variable = 'Shear_mag'
+
+
+path_to_session = path_to_directories + directory_names[0] + "means/session.xml"
+
+# FieldConvert calls
+def convert_bnd_fld_to_csv(f):
+    bid = extract_boundary_id(f)
+
+    field = Field(sys.argv, force_output=True)
+    InputModule.Create("xml", field, path_to_mesh_boundary[bid]).Run()
+    # InputModule.Create("xml", field, path_to_session).Run()
+    InputModule.Create("fld", field, f).Run()
+    OutputModule.Create("csv", field, f.replace(".fld", ".csv")).Run()
+
+
 
 
 if __name__ == "__main__":
-    fig = plt.figure(figsize=(9,4))
+    fig = plt.figure(figsize=(9,2))
     ax = fig.add_subplot(111)
     ylabel = r"$\overline{C_p}$"
     if surf_variable == "cf":
@@ -55,12 +74,22 @@ if __name__ == "__main__":
 
         # Get plot styling
         dt = get_time_step_size(full_directory_path)
-        label, marker, mfc, ls, color = get_label(full_directory_path, dt=dt)
+        label, marker, mfc, ls, color = get_label(full_directory_path, dt=dt, color=dir_color)
         print("\nProcessing {0}...".format(label))
 
         # Get names of available averages
-        ctu_info = get_ctu_names(f"{full_directory_path}/means/mean_fields_*_avg_{var_extension}{boundary_names[0]}.csv")
+        ctu_info = get_ctu_names(f"{full_directory_path}means/mean_fields_*_avg_{var_extension}{boundary_names[0]}.fld")
         ctu_names = [f"ctu_{start}_{end}" for start, end in zip(ctu_info[0], ctu_info[1])]
+
+        if not ctu_names and not "quasi3d" in dirname:
+            print(f"No mean fields found with glob string: {full_directory_path}/means/mean_fields_*_avg_{var_extension}{boundary_names[0]}.fld ")
+            continue
+
+        if "quasi3d" in dirname:
+            ctu_names = ["ctu_20_30"]
+        else:
+            ctu_names = [ctu_names[0]]  # take only longest average
+            print(f"using average for {ctu_names}.")
 
         # Reset x-origin to zero before all three wings are being processed
         xorigin = 0
@@ -70,8 +99,14 @@ if __name__ == "__main__":
 
             # Loops all wing elements (boundaries)
             for bname, b_color in zip(boundary_names, TABLEAU_COLORS):
-                filename = "means/mean_fields_" + ctuname + "_avg_" + var_extension + bname + ".csv"
+                filename = "means/mean_fields_" + ctuname + "_avg_" + var_extension + bname + ".fld"
+                if "quasi3d" in dirname:
+                    filename = f"{surf_variable.upper()}/mean_fields_" + ctuname + "_avg_" + var_extension + bname + ".csv"
                 full_file_path = full_directory_path + filename
+                if not "quasi3d" in dirname:
+                    convert_bnd_fld_to_csv(full_file_path)
+                    full_file_path = full_file_path.replace(".fld", ".csv")
+
                 if not os.path.exists(full_file_path):
                     print("Did not find {0}".format(full_file_path))
                     continue
@@ -105,10 +140,10 @@ if __name__ == "__main__":
                 if bname != boundary_names[0]:
                    label = ""
                 else:
-                   label += f" {ctuname}"
+                   label += ""#f" {ctuname}"
 
                 # Plot data
-                ax.plot(x, sq, marker=marker, linestyle='', markeredgewidth=1.5, color=ctu_color, label=label, markerfacecolor=mfc)#, alpha=0.8)
+                ax.plot(x, sq, marker=marker, linestyle='', markeredgewidth=1.5, color=dir_color, label=label, markerfacecolor=mfc)#, alpha=0.8)
 
                 #upper = 0.12
                 #ax.set_ylim([ax.get_ylim()[0], upper])
