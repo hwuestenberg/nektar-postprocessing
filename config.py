@@ -35,12 +35,12 @@ if case == 'eifw':
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work/physics/archer2/"
     save_directory = "/home/henrik/Documents/simulation_data/cpc-figures/"
 
-    path_to_mesh = path_to_directories + "mesh/mesh.xml"
+    path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + "/mesh/mesh.xml"
     # Order must follow boundary_names below
     path_to_mesh_boundary = [
-        path_to_directories + "mesh/mesh_b5.xml",
-        path_to_directories + "mesh/mesh_b6.xml",
-        path_to_directories + "mesh/mesh_b7.xml",
+        path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
+        path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
+        path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
     ]
 
     directory_names = [
@@ -85,14 +85,26 @@ if case == 'eifw':
     divtol = 1e3
 
     # Boundary data naming:
-    # b0 : main plane
-    # b1 : 1st flap
-    # b2 : 2nd flap
+    # b1 : main plane
+    # b8 : 1st flap
+    # b4 : 2nd flap
     boundary_names = [
-        "b0",
         "b1",
-        "b2",
+        "b8",
+        "b4",
     ]
+
+    boundary_names_long = [
+        "mainplane",
+        "flap1",
+        "flap2",
+    ]
+
+    boundary_names_long_map = {
+        boundary_names[0] : boundary_names_long[0],
+        boundary_names[1] : boundary_names_long[1],
+        boundary_names[2] : boundary_names_long[2],
+    }
 
     boundary_names_plot = [
         "Main plane",
@@ -100,10 +112,10 @@ if case == 'eifw':
         "2nd Flap",
     ]
 
-    boundary_map = {
-        'b0' : 5,
-        'b1' : 6,
-        'b2' : 7,
+    boundary_region_to_mesh_map = {
+        boundary_names[0] : 5,
+        boundary_names[1] : 6,
+        boundary_names[2] : 7,
     }
 
 

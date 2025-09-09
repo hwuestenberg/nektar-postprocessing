@@ -11,7 +11,7 @@ import pandas as pd
 import os
 
 
-from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_map, ctu_len, kinvis, \
+from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_region_to_mesh_map, ctu_len, kinvis, \
     path_to_mesh, path_to_mesh_boundary, boundary_names_plot
 from utilities import get_label
 
