@@ -1,6 +1,7 @@
 #!/usr/bin/env  python3
 import os, sys, subprocess, re
 from glob import glob
+from os.path import basename
 from pathlib import Path
 import numpy as np
 import pandas
@@ -11,9 +12,7 @@ from matplotlib import pyplot as plt, cm
 # from CharLESForces import *
 # from compareForcesCharLES import *
 
-from config import ctu_len, dtref
-
-
+from config import ctu_len, dtref, boundary_names
 
 
 def get_ctu_names(glob_string, descending=False):
@@ -118,10 +117,10 @@ def get_time_step_size(directory_name):
     phystime = dftime["phys_time"].to_numpy()
     steps = dftime["steps"].to_numpy()
 
-    # Use the entire available range instead of assuming at least 11 entries.
+    # Use the entire available range.
     # This avoids an IndexError for short log files and yields a robust average
     # time step size.
-    dt = (phystime[-1] - phystime[0]) / (steps[-1] - steps[0])
+    dt = (phystime[11] - phystime[0]) / (steps[11] - steps[0])
     return dt
 
 
@@ -152,14 +151,14 @@ def get_scheme(full_file_path):
 
     return scheme
 
-def get_color_by_scheme(full_file_path, dtcfd):
+def get_color_by_scheme(full_file_path, dtcfl):
     if "linear" in full_file_path:
         cmap = cm.get_cmap("Oranges")  # Use the "Oranges" colormap
         # color = cmap(0.2 + 0.8 * np.log(dtcfd) / np.log(100)) if dtcfd != 1 else 'tab:orange'
         color = 'tab:orange'
-        if dtcfd == 1:
+        if dtcfl == 1:
             color = 'tab:blue'
-        elif dtcfd > 10:
+        elif dtcfl > 10:
             color = 'tab:green'
     elif "semi" in full_file_path:
         color = 'tab:blue'
@@ -186,14 +185,14 @@ def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue
     ls = 'solid'
 
     # Add time step size
-    dtcfd = round(dt / dtref, 1)
-    if dt >= dtref:
+    dtcfl = round(dt / dtref, 1)
+    if dt >= dtref - 0.1 and dt <= dtref + 0.1:
         label += "{0:d}".format(
-            int(dtcfd)
+            int(dtcfl)
         )
     else:
         label += "{0:.1f}".format(
-            dtcfd
+            dtcfl
         )
     label += r"$ \Delta t_{CFL}$"
 
@@ -210,9 +209,14 @@ def get_label(full_file_path, dt = 0.0, sampling_frequency = 0, color ='tab:blue
     #     label += "Re = {0:.1e}".format(float(re))
 
     label += f" {get_scheme(full_file_path)}"
-    color = get_color_by_scheme(full_file_path, dtcfd)
+    color = get_color_by_scheme(full_file_path, dtcfl)
 
     label += f" {get_stabilisation(full_file_path)}"
+
+    # Overwrite label for Slaughter et al. (2023)
+    if "quasi3d" in full_file_path:
+        label = "Slaughter et al. (2023)"
+        color = 'black'
 
     # if "weak" in full_file_path:
     #     ls = 'dashed'
@@ -289,6 +293,13 @@ def check_sampling_rates(physTime, debug_plot=False):
         plt.show()
 
 
+def extract_boundary_id(f):
+    filename = basename(f).split('.')[0]
+    boundary_name = filename.split('_')[-1]
+    bid = boundary_names.index(boundary_name)
+    return bid
+
+
 
 """
     Marginal Standard Error Rule (mser)
@@ -362,4 +373,6 @@ def plot_charles_results():
     for simulation_name, simulation_label in zip(simulation_names, simulation_labels):
         dataForces[-1].append(CharLESForces(uref, lref, rhoref, Aref))
         dataForces[-1].import_forces(filename = filename, initial_time = 0, simulation_name = simulation_name, legend_label = simulation_label)
+
+
 
