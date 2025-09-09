@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 
-from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_map, ctu_len, kinvis, path_to_mesh, path_to_mesh_boundary
+from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_region_to_mesh_map, ctu_len, kinvis, path_to_mesh, path_to_mesh_boundary
 
 
 showGeometry = False
