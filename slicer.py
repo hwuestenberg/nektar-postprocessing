@@ -5,6 +5,8 @@ import json
 import sys
 from paraview.simple import *
 
+from config import boundary_names
+
 
 # To execute this script:
 # module load paraview/5.10.1
@@ -185,7 +187,7 @@ def do_equispaced_slices(input_vtu, max_n_sect: int, options: dict, axis: str):
         #    data_to_save = calculate_total_pressure(data_to_save)
         print(options["variables"])
 
-        if "b0" in in_file or "b1" in in_file or "b2" in in_file:
+        if any(b in in_file for b in boundary_names):
             slice_name += ".csv"
             SaveData(slice_name, proxy=data_to_save, PointDataArrays=options["variables"],Precision=8)
         else:
@@ -227,31 +229,7 @@ if __name__ == '__main__':
     if in_file:
         dirnames = [""]
         filenames = [in_file]
-    # else:
-    #
-    #     dirnames = [
-    #             #"5bl/physics/semidt1e-5/",
-    #             #"5bl/physics/implicitdt1e-4/",
-    #             #"5bl/physics/implicitdt5e-4/",
-    #             #"8bl/physics/semidt1e-5/",
-    #             #"8bl/physics/implicitdt1e-4/",
-    #             #"8bl/physics/implicitdt5e-4/",
-    #             #"refined/physics/semidt1e-5/",
-    #             #"refined/physics/implicitdt1e-4/",
-    #             #"refined/physics/implicitdt5e-4/",
-    #             #"please-work/physics/semidt1e-5/",
-    #             "please-work/physics/implicitdt1e-4/",
-    #             "please-work/physics/implicitdt5e-4/",
-    #             "please-work/physics/implicitdt1e-3/",
-    #             ]
-    #
-    #     ctuname = "ctu_15_20"
-    #
-    #     filenames = [
-    #             "mean_fields_" + ctuname + "_avg_wss_b0.vtu",
-    #             "mean_fields_" + ctuname + "_avg_wss_b1.vtu",
-    #             "mean_fields_" + ctuname + "_avg_wss_b2.vtu",
-    #             ]
+
 
     print("dirnames:",dirnames)
     print("filenames:",filenames)
@@ -265,7 +243,7 @@ if __name__ == '__main__':
             # Read the settings from the input json file
             #f_settings = open('/home/henrik/Documents/00_phd/03_project/simulations/codeVerification/f1-ifw/eifw/3d/input.json')
             #settings = json.load(f_settings)
-            if "b0" in in_file or "b1" in in_file or "b2" in in_file:
+            if any(b in in_file for b in boundary_names):
                 settings = set_spanwiseAverage()
             else:
                 settings = set_midplane()
