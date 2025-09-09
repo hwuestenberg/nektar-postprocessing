@@ -31,7 +31,7 @@ from config import (
 metric = customMetrics[1]
 
 forces_file = force_file_glob_strs[0]
-averaging_len = 10.1 # [CTU] redundant due to MSER, just use large number
+averaging_len = 100 # [CTU] redundant due to MSER, just use large number
 
 n_downsample = 2
 f_target = None#12500  # Downsample to target sample rate for all cases
@@ -65,7 +65,7 @@ print("Using forces_file:", forces_file)
 if __name__ == "__main__":
 
     # Create figure and axis
-    fig = plt.figure(figsize=(9,4))
+    fig = plt.figure(figsize=(7,2))
     ax = fig.add_subplot(111)
     ylabel = r"PSD($C_l$)"
     if metric == customMetrics[0]:
