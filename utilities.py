@@ -8,6 +8,7 @@ import pandas
 import pandas as pd
 from matplotlib import pyplot as plt, cm
 
+import config
 # Import for charles plots
 # from CharLESForces import *
 # from compareForcesCharLES import *
@@ -246,6 +247,27 @@ def plot_cumulative_mean_std(data, phys_time, axis, color, label):
                   alpha=0.01)
     axis.plot(phys_time, cumulative_avg, label=label, color=color)
 
+
+def get_dof(case_dictionary, node_directory_path, variable_string = "u"):
+    raw_log_file = glob(node_directory_path + "log*")[0]
+    start_pattern = "Assembly map statistics for field "
+    end_pattern = "Number of local/global dof"
+    capture = False
+    with open(raw_log_file, "r") as f:
+        for line in f:
+            if start_pattern + variable_string in line:
+                capture = True
+                continue
+            # Capture dof data in next line
+            if capture:
+                line_segments = line.strip().split(" ")
+                case_dictionary['global_dof'] = int(line_segments[-1])
+                case_dictionary['local_dof'] = int(line_segments[-2])
+            # End after capture
+            if end_pattern in line:
+                break
+    AssertionError(case_dictionary['global_dof'] and case_dictionary['local_dof'], f"Could not find local_dof or global_dof in log file {raw_log_file}.")
+    return
 
 def filter_time_interval(physTime : pd.Series, signal : pd.Series, signal_len_from_end : float, use_mask : bool = False):
     # Mask based criterion
