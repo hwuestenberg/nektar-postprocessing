@@ -6,8 +6,103 @@ use_iterations = True
 scaling = True
 
 
+
+#### Capability runs ####
+if case == 'capability':
+
+    # Walk through directories and merge files
+    log_file_glob_str = 'log*'
+    force_file_glob_strs = [
+        'FWING_TOTAL_forces.fce',
+        # 'LFW_fia_mp_forces.fce',
+        # 'LFW_element_1_forces.fce',
+        # 'LFW_element_2_forces.fce',
+    ]
+    history_file_glob_strs = [
+        # 'mainplane_spanwise.his',
+        # 'mainplane_streamwise.his',
+        # "mainplane-suction-midplane.his",
+        # 'flap1_spanwise.his',
+        # 'flap1_streamwise.his',
+        # 'flap2_spanwise_pressure.his',
+        # 'flap2_spanwise_suction.his',
+        # 'flap2_streamwise.his',
+        # 'wake_0_15.his',
+        # 'wake_0_225.his',
+        # 'wake_0_35.his',
+        # 'wake_0_65.his',
+    ]
+
+    path_to_directories = "/home/henrik/Documents/simulation_data/capability/"
+    save_directory = "/home/henrik/Documents/simulation_data/capability/graphics/"
+    #
+    # path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + "/mesh/mesh.xml"
+    # # Order must follow boundary_names below
+    # path_to_mesh_boundary = [
+    #     path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
+    #     path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
+    #     path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
+    # ]
+
+    directory_names = [
+        # "eifw/semiimplicit/dt1e-5/",
+        "fifw/semiimplicit/dt5e-6/",
+        # "wifw/semiimplicit/dt1e-6/",
+        #
+        # "eifw/linearimplicit/dt1e-5/",
+        # "fifw/linearimplicit/dt5e-6/",
+        # "wifw/linearimplicit/dt1e-6/",
+        #
+        # "eifw/substepping/dt1e-5/",
+        # "fifw/substepping/dt5e-6/",
+        # "wifw/substepping/dt1e-6/",
+    ]
+
+    # Skip initial or final n points for each (individual/subdir!) force file
+    # Note that a small overlap removes the pressure kick after restarting
+    # We found that this improves PSDs
+    force_file_skip_start = 5
+    force_file_skip_end = 0
+
+    # case-specific definitions
+    ylabels = ["$C_d$", "$C_l$"]#, "$C_S$", "$C_L$"]
+    ynames = ["Drag", "Lift"]#, "Sheer", "Lift"]
+    customMetrics = ["F1-total", "F3-total"]#, "F2-total", "F3-total"]
+
+    # Characteristic velocity and lengths
+    ref_velocity = 1.0 # non-dimensional velocity [ms]
+    chord_length = 0.25 # mainplane chord [m]
+    ctu_len = chord_length / ref_velocity # [s]
+    spanlen_npp = 0.05 # spanwise length for extruded IFW [m]
+    ref_area = ctu_len * spanlen_npp # reference area
+    kinvis = 1.448e-6
+
+    # reference time step size (CFL ~= 1)
+    dtref = 1e-5
+
+    # divergence tolerance for detection
+    divtol = 1e3
+
+    # Boundary data naming:
+    boundary_names = [
+    ]
+
+    boundary_names_long = [
+    ]
+
+    boundary_names_long_map = {
+    }
+
+    boundary_names_plot = [
+    ]
+
+    boundary_region_to_mesh_map = {
+    }
+
+
+
 #### CONFIG FOR 3D extruded IFW ####
-if case == 'eifw':
+elif case == 'eifw':
 
     # Walk through directories and merge files
     log_file_glob_str = 'log*'
