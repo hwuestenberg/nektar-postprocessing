@@ -1,6 +1,7 @@
 #!/usr/bin/env  python3
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FixedLocator
 
 params = {'text.usetex': True,
  'font.size' : 10,
@@ -15,7 +16,7 @@ import pandas as pd
 import os
 from glob import glob
 
-from utilities import get_time_step_size, mser, get_label, get_scheme
+from utilities import get_time_step_size, mser, get_label, get_scheme, get_dof
 from config import (
     directory_names,
     path_to_directories,
@@ -36,6 +37,10 @@ metric = "Execute"
 savename = f"scaling-{metric}"
 savename = save_directory + savename
 
+nodes_ref = int(4)
+# x_ref = 'nodes'
+x_ref = 'cpus'
+
 xlim = []
 ylim_su = []
 ylim_pe = []
@@ -46,6 +51,7 @@ case_columns = [
     "dt",
     "ncpu",
     "nodes",
+    "ncpus",
 ]
 
 timer_columns = [
@@ -84,19 +90,26 @@ replace_new = [
 if __name__ == "__main__":
 
     # Create figure and axes
-    fig = plt.figure(figsize=(5, 4))
-    ax_su = fig.add_subplot(211)
-    ax_pe = fig.add_subplot(212, sharex=ax_su)
+    fig = plt.figure(figsize=(4, 6))
+    ax_dt = fig.add_subplot(311)
+    ax_su = fig.add_subplot(312, sharex=ax_dt)
+    ax_pe = fig.add_subplot(313, sharex=ax_dt)
 
-    ylabel = r"Speed Up $S = T(N_P=1)/T(N_{P}=P)$"
+    ylabel = r"Comp. time per $\Delta t$"
+    ax_dt.set_ylabel(ylabel)
+    ax_dt.set_yscale('log')
+
+    ylabel = r"Speed Up"# $S = T(N_P=1)/T(N_{P}=P)$"
     ax_su.set_ylabel(ylabel)
+    ax_su.set_yscale('linear')
 
     ylabel = "Parallel Efficiency"
     ax_pe.set_ylabel(ylabel)
 
-    ax_pe.set_xlabel(r"Number of nodes, each with $N_{P} = 64$ CPUs")
-    ax_su.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+    ax_pe.set_xlabel(r"Number of Processors $N_{P}$")
+    ax_pe.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
+    ax_dt.grid(which='both', axis='both')
     ax_su.grid(which='both', axis='both')
     ax_pe.grid(which='both', axis='both')
 
@@ -130,9 +143,16 @@ if __name__ == "__main__":
             # Get number of cpus and nodes
             case_dict['ncpu'] = n_cpus
             case_dict['nodes'] = n_nodes
+            case_dict['ncpus'] = n_cpus * n_nodes
 
             # Add processed file name
             node_directory_path = full_directory_path + f"{n_nodes}x{n_cpus}/"
+            # full_file_path = node_directory_path + process_file
+
+            # Get number of local/global DoF
+            get_dof(case_dict, node_directory_path)
+            case_dict['global_dof_per_rank'] = case_dict['global_dof'] / case_dict['ncpus']
+            case_dict['local_dof_per_rank'] = case_dict['local_dof'] / case_dict['ncpus']
 
             # Get time step size
             dt = get_time_step_size(node_directory_path)
@@ -142,82 +162,82 @@ if __name__ == "__main__":
             label, marker, mfc, ls, color = get_label(node_directory_path, dt)
             print("\nProcessing {0}...".format(label))
 
-            # # Read file
-            # df = pd.read_csv(full_file_path, sep=',')
-            #
-            # # Remove initial 10% of data (this includes setup)
-            # npoints = len(df)
-            # npoints_remove = int(0.1 * npoints)
-            # df = df.iloc[npoints_remove:]
-            #
-            # # Extract signal
-            # metricData = df[metric]
-            #
-            # # Do statistics
-            # mean = metricData.mean()
-            # std = metricData.std()
-            # cv = std/mean
-            #
-            # # # Verbose statistics
-            # # print("Mean = {0}".format(mean))
-            # # print("Std  = {0}".format(std))
-            # # print("CV   = {0}\n".format(cv))
-            #
-            # # Add statistics to dict
-            # case_dict[f'{metric}-mean'] = metricData.mean()
-            # case_dict[f'{metric}-std'] = metricData.std()
-
             # Find raw log file
-            log_file = glob(node_directory_path + "log.*")[0]
+            log_files = glob(node_directory_path + "log*")
+            log_file = [file for file in log_files if not "log_info.csv" in file][0]
 
             ## Preproessing to make read_csv possible
-            # Read performance by function into csv
-            skiprows = -1
-            with open(log_file, "r") as log:
-                for line in log.readlines():
-                    if "Execute" in line:
+            timer_file = node_directory_path + "timer_info.txt"
+            reachTimerOutput = False
+            with open(log_file, 'r', encoding='utf-8') as f_in, \
+                    open(timer_file, 'w', encoding='utf-8') as f_out:
+
+                for i, line in enumerate(f_in):
+                    # Detect start of timer output, skip all lines before
+                    if "Execute" in line or reachTimerOutput:
+                        reachTimerOutput = True
+                    else:
+                        continue
+
+                    # Detect end of output
+                    if "Victory!" in line:
                         break
-                    skiprows += 1
 
-            # Fix spaces
-            with open(log_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-                for old, new in zip(replace_old, replace_new):
-                    content = content.replace(old, new)
-            new_log_file = log_file.replace("log.","log_fix.")
-            with open(new_log_file, 'w', encoding='utf-8') as f:
-                f.write(content)
+                    for old, new in zip(replace_old, replace_new):
+                        line = line.replace(old, new)
+                    f_out.write(line)
 
-            df_func = pd.read_csv(new_log_file, skiprows=skiprows, sep="\s+|\t+|\s+\t+|\t+\s+", engine='python')
+            # Read timer output
+            df_func = pd.read_csv(timer_file, names=timer_columns, sep="\s+|\t+|\s+\t+|\t+\s+", engine='python')
             df_func = df_func.dropna(axis=1)
             df_func.columns = timer_columns
+
+            # Add metadata from case_dict
             for case_column in case_columns:
                 df_func[case_column] = case_dict[case_column]
-            print(df_func)
+
+            # Verbose print
+            # print(df_func)
 
             # Transform to DataFrame and concatenate
             df_stat = pd.concat([df_stat, df_func], axis=0, ignore_index=True)
 
-        # Verbose check concatenation
-        print(df_stat)
+        # # Verbose check concatenation
+        # print(df_stat)
+
+
+    # Filter minimum nodes
+    nodes_min = df_stat['nodes'].min()
+    if nodes_ref:
+        df_stat = df_stat[df_stat['nodes'] >= nodes_ref]
+    else:
+        nodes_ref = nodes_min
 
 
     # Plot by scheme: speedup
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
         # Extract data for this plot
-        df_scheme = df_stat.loc[df_stat['scheme'] == scheme].loc[df_stat['function'] == metric]
-        nodes_ref = df_scheme['nodes'].min()
+        df_plot = df_stat.loc[df_stat['scheme'] == scheme].loc[df_stat['function'] == metric]
+
+        # Comp. time per time step
+        dt = df_plot['average']
 
         # Compute speed-up (strong scaling)
-        su = df_scheme['average'].iloc[0] / df_scheme['average']
+        su = df_plot['average'].iloc[0] / df_plot['average']
 
         # Compute parallel efficiency (strong scaling)
-        pe = 1 - ((2 ** np.arange(len(df_scheme)) - su) / su)
+        pe = 1 - ((2 ** np.arange(len(df_plot)) - su) / su)
+
+        # Choose x-reference
+        x_val = df_plot['ncpus']
+        if x_ref == "nodes":
+            x_val = df_plot['nodes'] / nodes_min
 
         # Plot
-        ax_su.plot(df_scheme['nodes'], su, marker='o', label=scheme)
-        ax_pe.plot(df_scheme['nodes'], pe, marker='o', label=scheme)
-        # ax.errorbar(df_plot['nodes'] / nodes_ref, su, df_plot[f'{metric}-std'],
+        ax_dt.plot(x_val, dt, marker='o', label=scheme)
+        ax_su.plot(x_val, su, marker='o', label=scheme)
+        ax_pe.plot(x_val, pe, marker='o', label=scheme)
+        # ax.errorbar(x_val, su, df_plot[f'{metric}-std'],
         #             color=scheme_color, capsize=4)
 
     ## Aesthetics
