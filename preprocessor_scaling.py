@@ -17,13 +17,15 @@ from config import (
     force_file_skip_end,
     log_file_glob_str,
     use_iterations,
-    use_cfl,
     DEBUG,
     scaling,
     customMetrics,
 )
 from utilities import get_data_frame
 
+
+# Do not use CFL for scaling
+use_cfl = False
 
 
 def adjust_info_length(step_info, cfl_info = [[]], iter_info = [[]]):
@@ -319,6 +321,7 @@ if __name__ == "__main__":
 
                 # Find log file(s) in sub-directory
                 files = glob(node_directory_path + file_glob_str)
+                files = [file for file in files if not "log_info.csv" in file]
                 if len(files) == 0:
                     print(f"WARNING. Could not find any files using glob string: {file_glob_str} on path: {node_directory_path}")
                     continue
