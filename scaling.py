@@ -1,6 +1,7 @@
 #!/usr/bin/env  python3
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FixedLocator
 
 params = {'text.usetex': True,
  'font.size' : 10,
@@ -15,7 +16,7 @@ import pandas as pd
 import os
 from glob import glob
 
-from utilities import get_time_step_size, mser, get_label, get_scheme
+from utilities import get_time_step_size, mser, get_label, get_scheme, get_dof
 from config import (
     directory_names,
     path_to_directories,
@@ -38,6 +39,10 @@ process_file = "log_info.csv"
 savename = f"scaling"
 savename = save_directory + savename
 
+nodes_ref = int(4)
+# x_ref = 'nodes'
+x_ref = 'cpus'
+
 xlim = []
 ylim_su = []
 ylim_pe = []
@@ -47,19 +52,26 @@ ylim_pe = []
 if __name__ == "__main__":
 
     # Create figure and axes
-    fig = plt.figure(figsize=(5, 4))
-    ax_su = fig.add_subplot(211)
-    ax_pe = fig.add_subplot(212, sharex=ax_su)
+    fig = plt.figure(figsize=(4, 6))
+    ax_dt = fig.add_subplot(311)
+    ax_su = fig.add_subplot(312, sharex=ax_dt)
+    ax_pe = fig.add_subplot(313, sharex=ax_dt)
 
-    ylabel = r"Speed Up $S = T(N_P=1)/T(N_{P}=P)$"
+    ylabel = r"Comp. time per $\Delta t$"
+    ax_dt.set_ylabel(ylabel)
+    ax_dt.set_yscale('log')
+
+    ylabel = r"Speed Up"# $S = T(N_P=1)/T(N_{P}=P)$"
     ax_su.set_ylabel(ylabel)
+    ax_su.set_yscale('linear')
 
     ylabel = "Parallel Efficiency"
     ax_pe.set_ylabel(ylabel)
 
-    ax_su.set_xlabel(r"Number of Processors $N_{P}$")
-    ax_su.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+    ax_pe.set_xlabel(r"Number of Processors $N_{P}$")
+    ax_pe.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
+    ax_dt.grid(which='both', axis='both')
     ax_su.grid(which='both', axis='both')
     ax_pe.grid(which='both', axis='both')
 
@@ -96,10 +108,16 @@ if __name__ == "__main__":
             # Get number of cpus and nodes
             case_dict['ncpu'] = n_cpus
             case_dict['nodes'] = n_nodes
+            case_dict['ncpus'] = n_cpus * n_nodes
 
             # Add processed file name
             node_directory_path = full_directory_path + f"{n_nodes}x{n_cpus}/"
             full_file_path = node_directory_path + process_file
+
+            # Get number of local/global DoF
+            get_dof(case_dict, node_directory_path)
+            case_dict['global_dof_per_rank'] = case_dict['global_dof'] / case_dict['ncpus']
+            case_dict['local_dof_per_rank'] = case_dict['local_dof'] / case_dict['ncpus']
 
             # Get time step size
             dt = get_time_step_size(node_directory_path)
@@ -125,11 +143,6 @@ if __name__ == "__main__":
             std = metricData.std()
             cv = std/mean
 
-            # # Verbose statistics
-            # print("Mean = {0}".format(mean))
-            # print("Std  = {0}".format(std))
-            # print("CV   = {0}\n".format(cv))
-
             # Add statistics to dict
             case_dict[f'{metric}-mean'] = metricData.mean()
             case_dict[f'{metric}-std'] = metricData.std()
@@ -142,11 +155,21 @@ if __name__ == "__main__":
         print(df_stat)
 
 
+    # Filter minimum nodes
+    nodes_min = df_stat['nodes'].min()
+    if nodes_ref:
+        df_stat = df_stat[df_stat['nodes'] >= nodes_ref]
+    else:
+        nodes_ref = nodes_min
+
+
     # Plot by scheme: speedup
-    nodes_ref = df_stat['nodes'].min()
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
         # Extract data for this plot
         df_plot = df_stat.loc[df_stat['scheme'] == scheme]
+
+        # Comp. time per time step
+        dt = df_plot[f'{metric}-mean']
 
         # Compute speed-up (strong scaling)
         su = df_plot[f'{metric}-mean'].iloc[0] / df_plot[f'{metric}-mean']
@@ -154,10 +177,16 @@ if __name__ == "__main__":
         # Compute parallel efficiency (strong scaling)
         pe = 1 - ((2 ** np.arange(len(df_plot)) - su) / su)
 
+        # Choose x-reference
+        x_val = df_plot['ncpus']
+        if x_ref == "nodes":
+            x_val = df_plot['nodes'] / nodes_min
+
         # Plot
-        ax_su.plot(df_plot['nodes'] / nodes_ref, su, marker='o', label=scheme)
-        ax_pe.plot(df_plot['nodes'] / nodes_ref, pe, marker='o', label=scheme)
-        # ax.errorbar(df_plot['nodes'] / nodes_ref, su, df_plot[f'{metric}-std'],
+        ax_dt.plot(x_val, dt, marker='o', label=scheme)
+        ax_su.plot(x_val, su, marker='o', label=scheme)
+        ax_pe.plot(x_val, pe, marker='o', label=scheme)
+        # ax.errorbar(x_val, su, df_plot[f'{metric}-std'],
         #             color=scheme_color, capsize=4)
 
     ## Aesthetics
@@ -172,6 +201,17 @@ if __name__ == "__main__":
     ax_su.set_xlim(xlim)
     ax_su.set_ylim(ylim_su)
     ax_pe.set_ylim(ylim_pe)
+
+    # # Create top axis with dof_per_rank
+    # positions where you want the top labels to appear:
+    x_pos = df_stat['ncpus'].to_numpy()  # <- your primary x positions
+    x2_lab = df_stat['global_dof_per_rank'].astype(int).astype(str)
+
+    ax2 = ax_dt.twiny()
+    ax2.set_xlim(ax_dt.get_xlim())  # keep same limits
+    ax2.xaxis.set_major_locator(FixedLocator(x_pos))  # same number as labels
+    ax2.set_xticklabels(x2_lab)  # now lengths match
+    ax2.set_xlabel('Global DoF per rank')
 
     ax_su.legend()
 
