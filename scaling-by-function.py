@@ -31,15 +31,16 @@ from config import (
 
 
 
-# # Choose lift [1] or drag [0]
 metric = "Execute"
+# metric = "ViscousSolve"
+# metric = "PressureSolve"
 
 savename = f"scaling-{metric}"
 savename = save_directory + savename
 
 nodes_ref = int(4)
 # x_ref = 'nodes'
-x_ref = 'cpus'
+x_ref = 'ncpus'
 
 xlim = []
 ylim_su = []
@@ -52,6 +53,8 @@ case_columns = [
     "ncpu",
     "nodes",
     "ncpus",
+    "global_dof_per_rank",
+    "local_dof_per_rank"
 ]
 
 timer_columns = [
@@ -90,7 +93,7 @@ replace_new = [
 if __name__ == "__main__":
 
     # Create figure and axes
-    fig = plt.figure(figsize=(4, 6))
+    fig = plt.figure(figsize=(6, 6))
     ax_dt = fig.add_subplot(311)
     ax_su = fig.add_subplot(312, sharex=ax_dt)
     ax_pe = fig.add_subplot(313, sharex=ax_dt)
@@ -213,6 +216,11 @@ if __name__ == "__main__":
     else:
         nodes_ref = nodes_min
 
+    # Add ideal reference lines
+    ideal_su = df_stat[x_ref].unique() / df_stat[x_ref].unique().min()
+    ax_su.plot(df_stat[x_ref].unique(), ideal_su, linestyle='--', color='black', label='ideal')
+    ax_pe.plot(df_stat[x_ref].unique(), np.ones_like(df_stat[x_ref].unique()), linestyle='--', color='black', label='ideal')
+
 
     # Plot by scheme: speedup
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
@@ -232,6 +240,12 @@ if __name__ == "__main__":
         x_val = df_plot['ncpus']
         if x_ref == "nodes":
             x_val = df_plot['nodes'] / nodes_min
+
+        # Add ideal reference for comp. time per dt
+        dt_label = 'ideal'
+        if scheme_color != list(TABLEAU_COLORS)[0]:
+            dt_label = ''
+        ax_dt.plot(x_val, dt.iloc[0] / ideal_su, linestyle='--', color='black', label=dt_label)
 
         # Plot
         ax_dt.plot(x_val, dt, marker='o', label=scheme)
@@ -253,7 +267,7 @@ if __name__ == "__main__":
     ax_su.set_ylim(ylim_su)
     ax_pe.set_ylim(ylim_pe)
 
-    ax_su.legend()
+    ax_dt.legend()
 
 
     # Save data
