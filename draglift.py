@@ -33,6 +33,7 @@ from config import (
 metric = customMetrics[1]
 
 forces_file = force_file_glob_strs[0]
+forces_file_noext = forces_file.split('.')[0]
 # forces_file = "DragLift.fce"
 ctu_skip = 100 # sort of redundant with MSER
 use_mser = True
@@ -41,7 +42,7 @@ n_downsample = 2
 
 
 # Prefix for any saved figures
-savename = f"{metric}-{forces_file.split('.')[0]}-end-of-transient"
+savename = f"{metric}-{forces_file_noext}-end-of-transient"
 savename = save_directory + savename
 ############################
 
@@ -72,8 +73,12 @@ if __name__ == "__main__":
     for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
         # Setup paths
         full_directory_path = path_to_directories + dirname
-        filename = forces_file.replace(".fce", f"-process-overlap-{force_file_skip_start}.fce")
-        full_file_path = full_directory_path + filename
+        full_file_path = full_directory_path + "forces.pkl"
+
+        # Check if file exists
+        if not os.path.exists(full_file_path):
+            print(f"File {full_file_path} does not exist. Skipping.")
+            continue
 
         # Get time step size
         # Note that we cannot detect 4e-6 from force file
@@ -87,8 +92,12 @@ if __name__ == "__main__":
         label, marker, mfc, ls, color = get_label(full_file_path, dt, raw_label=False)
         print("\nProcessing {0}...".format(label))
 
-        # Read file
-        df = pd.read_csv(full_file_path, sep=',')
+        # Read forces file
+        # df = pd.read_csv(full_file_path, sep=',')
+        df = pd.read_pickle(full_file_path)
+
+        # Select specific force output
+        df = df[forces_file_noext]
 
         # Extract time and data
         physTime = df["Time"]

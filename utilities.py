@@ -13,7 +13,7 @@ import config
 # from CharLESForces import *
 # from compareForcesCharLES import *
 
-from config import ctu_len, dtref, boundary_names
+from config import ctu_len, dtref, boundary_names, log_file_glob_strs
 
 
 def get_ctu_names(glob_string, descending=False):
@@ -112,7 +112,8 @@ def get_time_step_size(directory_name):
         return 4e-6
 
     # Read cputime.dat
-    dftime = pd.read_csv(directory_name + "log_info.csv", sep=",")
+    # dftime = pd.read_csv(directory_name + "log_info.csv", sep=",")
+    dftime = pd.read_pickle(directory_name + "log_info.pkl")[log_file_glob_strs[0]]
 
     # Get time/step info for x-axis
     phystime = dftime["phys_time"].to_numpy()
@@ -157,10 +158,12 @@ def get_color_by_scheme(full_file_path, dtcfl):
         cmap = cm.get_cmap("Oranges")  # Use the "Oranges" colormap
         # color = cmap(0.2 + 0.8 * np.log(dtcfd) / np.log(100)) if dtcfd != 1 else 'tab:orange'
         color = 'tab:orange'
-        if dtcfl == 1:
-            color = 'tab:blue'
-        elif dtcfl > 10:
-            color = 'tab:green'
+        if dtcfl > 90:
+            color = 'tab:red'
+        # if dtcfl == 1:
+        #     color = 'tab:blue'
+        # elif dtcfl > 10:
+        #     color = 'tab:green'
     elif "semi" in full_file_path:
         color = 'tab:blue'
     elif "substepping" in full_file_path:
@@ -249,7 +252,11 @@ def plot_cumulative_mean_std(data, phys_time, axis, color, label):
 
 
 def get_dof(case_dictionary, node_directory_path, variable_string = "u"):
-    raw_log_file = glob(node_directory_path + "log*")[0]
+    log_files = glob(node_directory_path + log_file_glob_strs[0])
+    # Remove preprocessed log_info.csv file
+    raw_log_file = [l for l in log_files if not "log_info.pkl" in l][0]
+
+    # Find assembly map statistics in log file
     start_pattern = "Assembly map statistics for field "
     end_pattern = "Number of local/global dof"
     capture = False

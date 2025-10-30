@@ -20,13 +20,7 @@ from utilities import get_time_step_size, mser, get_label, get_scheme, get_dof
 from config import (
     directory_names,
     path_to_directories,
-    dtref,
-    customMetrics,
-    ref_area,
-    ctu_len,
-    divtol,
-    force_file_skip_start,
-    save_directory,
+    save_directory, log_file_glob_strs,
 )
 
 
@@ -34,7 +28,9 @@ from config import (
 # # Choose lift [1] or drag [0]
 metric = "cpu_time"
 # metric = "parallelEfficiency"
-process_file = "log_info.csv"
+process_file = "log_info.pkl"
+
+log_str = log_file_glob_strs[0]
 
 savename = f"scaling"
 savename = save_directory + savename
@@ -97,7 +93,9 @@ if __name__ == "__main__":
 
         # use replace to change to scaling directory
         full_directory_path = full_directory_path.replace("physics", "scaling")
-        node_directories = [x for x in os.walk(full_directory_path)][0][1] # get all Yx64 directories
+        node_directories = [x for x in os.walk(full_directory_path)][0][1]
+        # Remove that have not been preprocessed yet
+        node_directories = [x for x in node_directories if len(glob(full_directory_path + x + "/" + process_file)) == 1]
         nodes = sorted([int(x.split("x")[0]) for x in node_directories])
         n_cpus = max([int(x.split("x")[1]) for x in node_directories])
 
@@ -131,7 +129,13 @@ if __name__ == "__main__":
             print("\nProcessing {0}...".format(label))
 
             # Read file
-            df = pd.read_csv(full_file_path, sep=',')
+            # df = pd.read_csv(full_file_path, sep=',')
+            df = pd.read_pickle(full_file_path)
+            df = df[log_str]
+
+            # Safe conversion to numeric
+            df = df.apply(pd.to_numeric)
+
 
             # Remove initial 10% of data (this includes setup)
             npoints = len(df)
@@ -174,21 +178,21 @@ if __name__ == "__main__":
     # Plot by scheme: speedup
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
         # Extract data for this plot
-        df_plot = df_stat.loc[df_stat['scheme'] == scheme]
+        df_scheme = df_stat.loc[df_stat['scheme'] == scheme]
 
         # Comp. time per time step
-        dt = df_plot[f'{metric}-mean']
+        dt = df_scheme[f'{metric}-mean']
 
         # Compute speed-up (strong scaling)
-        su = df_plot[f'{metric}-mean'].iloc[0] / df_plot[f'{metric}-mean']
+        su = df_scheme[f'{metric}-mean'].iloc[0] / df_scheme[f'{metric}-mean']
 
         # Compute parallel efficiency (strong scaling)
-        pe = 1 - ((2 ** np.arange(len(df_plot)) - su) / su)
+        pe = 1 - ((ideal_su - su) / su)
 
         # Choose x-reference
-        x_val = df_plot['ncpus']
+        x_val = df_scheme['ncpus']
         if x_ref == "nodes":
-            x_val = df_plot['nodes'] / nodes_min
+            x_val = df_scheme['nodes'] / nodes_min
 
         # Add ideal reference for comp. time per dt
         dt_label = 'ideal'
@@ -216,13 +220,20 @@ if __name__ == "__main__":
     ax_su.set_ylim(ylim_su)
     ax_pe.set_ylim(ylim_pe)
 
-    #
-    #
-    # # # Create top axis with dof_per_rank
-    # # positions where you want the top labels to appear:
-    # x_pos = df_stat['ncpus'].to_numpy()  # <- your primary x positions
-    # x2_lab = df_stat['global_dof_per_rank'].astype(int).astype(str)
-    #
+    # # Create top axis with dof_per_rank
+    # positions where you want the top labels to appear:
+    x_pos = df_scheme['ncpus'].to_numpy()  # <- your primary x positions
+    x2_lab = df_scheme['global_dof_per_rank'].astype(int).astype(str)
+    y_pos = df_scheme[f'{metric}-mean'] * 1.1
+
+    for x, y, text in zip(x_pos, y_pos, x2_lab):
+        ax_dt.text(x, y, text, ha='center', va='bottom', fontsize=8,
+                   color='black',
+                   bbox=dict(facecolor='white', edgecolor='white', alpha=0.5))
+    ax_dt.set_title("Numbers are global DoF per rank")
+        # ax_dt.annotate(text, xy=(x, y), xytext=(0, 10), textcoords='offset points',
+        #                ha='center', va='bottom', fontsize=8)
+
     # ax2 = ax_dt.twiny()
     # ax2.set_xlim(ax_dt.get_xlim())  # keep same limits
     # ax2.xaxis.set_major_locator(FixedLocator(x_pos))  # same number as labels

@@ -26,16 +26,25 @@ from config import (
     ctu_len,
     divtol,
     force_file_skip_start,
-    save_directory,
+    save_directory, log_file_glob_strs,
 )
 
 
 
-metric = "Execute"
+# metric = "Execute"
 # metric = "ViscousSolve"
 # metric = "PressureSolve"
+metrics = [
+    # "AdvectionTerms",
+    "PressureSolve",
+    "ViscousSolve",
+]
 
-savename = f"scaling-{metric}"
+log_str = log_file_glob_strs[0]
+
+savename = f"scaling"
+for metric in metrics:
+    savename += f"-{metric}"
 savename = save_directory + savename
 
 nodes_ref = int(4)
@@ -132,7 +141,9 @@ if __name__ == "__main__":
 
         # use replace to change to scaling directory
         full_directory_path = full_directory_path.replace("physics", "scaling")
-        node_directories = [x for x in os.walk(full_directory_path)][0][1] # get all Yx64 directories
+        node_directories = [x for x in os.walk(full_directory_path)][0][1]
+        # Remove that have not been preprocessed yet
+        node_directories = [x for x in node_directories if len(glob(full_directory_path + x + "/" + log_file_glob_strs[0])) > 0]
         nodes = sorted([int(x.split("x")[0]) for x in node_directories])
         n_cpus = max([int(x.split("x")[1]) for x in node_directories])
 
@@ -166,7 +177,8 @@ if __name__ == "__main__":
             print("\nProcessing {0}...".format(label))
 
             # Find raw log file
-            log_files = glob(node_directory_path + "log*")
+            log_files = glob(node_directory_path + log_file_glob_strs[0])
+            log_files = [l for l in log_files if not ".pkl" in l]
             log_file = [file for file in log_files if not "log_info.csv" in file][0]
 
             ## Preproessing to make read_csv possible
@@ -224,35 +236,36 @@ if __name__ == "__main__":
 
     # Plot by scheme: speedup
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
-        # Extract data for this plot
-        df_plot = df_stat.loc[df_stat['scheme'] == scheme].loc[df_stat['function'] == metric]
+        for metric, ls in zip(metrics, ['solid', 'dashed', 'dotted']):
+            # Extract data for this plot
+            df_plot = df_stat.loc[df_stat['scheme'] == scheme].loc[df_stat['function'] == metric]
 
-        # Comp. time per time step
-        dt = df_plot['average']
+            # Comp. time per time step
+            dt = df_plot['average']
 
-        # Compute speed-up (strong scaling)
-        su = df_plot['average'].iloc[0] / df_plot['average']
+            # Compute speed-up (strong scaling)
+            su = df_plot['average'].iloc[0] / df_plot['average']
 
-        # Compute parallel efficiency (strong scaling)
-        pe = 1 - ((2 ** np.arange(len(df_plot)) - su) / su)
+            # Compute parallel efficiency (strong scaling)
+            pe = 1 - ((ideal_su - su) / su)
 
-        # Choose x-reference
-        x_val = df_plot['ncpus']
-        if x_ref == "nodes":
-            x_val = df_plot['nodes'] / nodes_min
+            # Choose x-reference
+            x_val = df_plot['ncpus']
+            if x_ref == "nodes":
+                x_val = df_plot['nodes'] / nodes_min
 
-        # Add ideal reference for comp. time per dt
-        dt_label = 'ideal'
-        if scheme_color != list(TABLEAU_COLORS)[0]:
-            dt_label = ''
-        ax_dt.plot(x_val, dt.iloc[0] / ideal_su, linestyle='--', color='black', label=dt_label)
+            # Add ideal reference for comp. time per dt
+            dt_label = 'ideal'
+            if scheme_color != list(TABLEAU_COLORS)[0] or metric != metrics[0]:
+                dt_label = ''
+            ax_dt.plot(x_val, dt.iloc[0] / ideal_su, linestyle='--', color='black', label=dt_label)
 
-        # Plot
-        ax_dt.plot(x_val, dt, marker='o', label=scheme)
-        ax_su.plot(x_val, su, marker='o', label=scheme)
-        ax_pe.plot(x_val, pe, marker='o', label=scheme)
-        # ax.errorbar(x_val, su, df_plot[f'{metric}-std'],
-        #             color=scheme_color, capsize=4)
+            # Plot
+            ax_dt.plot(x_val, dt, marker='o', color=scheme_color, label=scheme + " " + metric, linestyle=ls)
+            ax_su.plot(x_val, su, marker='o', color=scheme_color, label=scheme + " " + metric, linestyle=ls)
+            ax_pe.plot(x_val, pe, marker='o', color=scheme_color, label=scheme + " " + metric, linestyle=ls)
+            # ax.errorbar(x_val, su, df_plot[f'{metric}-std'],
+            #             color=scheme_color, capsize=4)
 
     ## Aesthetics
     # Set x/y-limits

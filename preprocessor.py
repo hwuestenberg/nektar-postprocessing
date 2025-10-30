@@ -15,7 +15,7 @@ from config import (
     force_file_skip_end,
     force_file_glob_strs,
     history_file_glob_strs,
-    log_file_glob_str,
+    log_file_glob_strs,
     use_iterations,
     use_cfl,
     DEBUG,
@@ -291,102 +291,172 @@ def test_parse_log_file():
         print('Meta info:', i, type(i), len(df_log[i]))
 
 
-# TODO extend this for History point files (justify time-averaging windows)
+# Find and sort all available subdirs following the naming convention ctu_start_end where start and end are integers
+def find_subdirs(full_directory_path):
+    subdirs = [f.path for f in os.scandir(full_directory_path) if f.is_dir() and 'ctu' in f.name]
+    if len(subdirs) == 0:
+        subdirs.append(full_directory_path + ".")  # scan root dirname as well
+        print(f"\tNo subdirectories to merge. Directly parsing this directory: {Path(subdirs[0]).parts[-1]}")
+    else:
+        subdirs = sorted(subdirs, key=lambda x: int(re.search(r'ctu_(\d+)_', x).group(1)))
+        print(f"\tFound subdirectories for merging: {[Path(subdir).parts[-1] for subdir in subdirs]}")
+
+    return subdirs
+
+
+def find_process_file(subdir, file_glob_str):
+    # Add / for safety
+    cdpath = subdir + "/"
+
+    # Glob all files with glob_str
+    files = glob(cdpath + file_glob_str)
+    files = [l for l in files if not "log_info.pkl" in l]
+
+    assert(len(files) == 0, f"Error. Could not find any files using glob string: {file_glob_str} on path: {cdpath}")
+
+    # Choose process file as first or only file
+    if len(files) > 1:
+        print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]} on path: {cdpath}")
+        process_file = files[0]
+    elif len(files) == 0:
+        process_file = None
+    else:
+        process_file = files[0]
+
+    return process_file
+
+
+def split_history_points(df_all_points):
+    # Get number of history points
+    npoints = int(len(df_all_points['Time']) / len(df_all_points['Time'].unique()))
+
+    idx = np.arange(len(df_all_points))
+    df_all_points = df_all_points.assign(
+        point=idx % npoints,  # cycles 0..N-1
+        time=idx // npoints  # increases every N rows
+    )
+
+    # Put keys into the index (optional but handy)
+    df_all_points = df_all_points.set_index(['time', 'point']).sort_index()
+
+    # Separate history points with keys
+    return df_all_points
+
+
+
+def read_file(file_glob_str, process_file):
+    if file_glob_str in ["log*", "*.l*"]:
+        df = parse_log_file(process_file)
+    elif file_glob_str.endswith('.fce'):
+        df = get_data_frame(
+            process_file,
+            skip_start=force_file_skip_start,
+            skip_end=force_file_skip_end,
+        )
+    elif file_glob_str.endswith('.his'):
+        df = get_data_frame(
+            process_file,
+            skip_start=force_file_skip_start,
+            skip_end=force_file_skip_end,
+        )
+        df = split_history_points(df)
+    else:
+        df = get_data_frame(
+            process_file,
+            skip_start=force_file_skip_start,
+            skip_end=force_file_skip_end,
+        )
+    return df
+
+
+
+
 # TODO extend this for Energy (3D) files
 if __name__ == "__main__":
     # Combine log, force and history file patterns
-    all_file_glob_strs = [log_file_glob_str, *force_file_glob_strs, *history_file_glob_strs]
+    all_file_glob_strs = []
+    output_names = []
+    if len(log_file_glob_strs) > 0:
+        all_file_glob_strs += [log_file_glob_strs]
+        output_names += ["log_info"]
+    if len(force_file_glob_strs) > 0:
+        all_file_glob_strs += [force_file_glob_strs]
+        output_names += ["forces"]
+    if len(history_file_glob_strs) > 0:
+        all_file_glob_strs += [history_file_glob_strs]
+        output_names += ["historypoints"]
 
-    # Loop all possible files (logs, force, history, ...)
-    for file_glob_str in all_file_glob_strs:
-        # Loop all directories (cases)
-        for directory_name in directory_names:
-            # Create empty dataframe for this file(-type)
-            df_full = pd.DataFrame()
-            df_file = pd.DataFrame()
+    # Loop all directories (cases)
+    for directory_name in directory_names:
+        print(f"Processing directory {directory_name}")
+        full_directory_path = path_to_directories + directory_name
 
-            # Verbose print
-            print(f"Processing directory {directory_name}")
-            full_directory_path = path_to_directories + directory_name
+        # Find all subdirectories in directory (concatenate multiple simulations)
+        subdirs = find_subdirs(full_directory_path)
 
-            # Find and sort all available subdirs following the naming convention ctu_start_end where start and end are integers
-            subdirs = [f.path for f in os.scandir(full_directory_path) if f.is_dir() and 'ctu' in f.name]
-            if len(subdirs) == 0:
-                subdirs.append(full_directory_path + ".")  # scan root dirname as well
-                print(f"\tNo subdirectories to merge. Directly parsing this directory: {Path(subdirs[0]).parts[-1]}")
-            else:
-                subdirs = sorted(subdirs, key=lambda x: int(re.search(r'ctu_(\d+)_', x).group(1)))
-                print(f"\tFound subdirectories for merging: {[Path(subdir).parts[-1] for subdir in subdirs]}")
+        # Loop all groups of files to be processed (log, force, history, ...)
+        for output_name, file_glob_strs in zip(output_names, all_file_glob_strs):
+            print(f"\tglob string {output_name}")
 
-            # Loop through all subdirectories, read files and merge all data
-            for subdir in subdirs:
-                print(f"\tProcessing sub-directory {subdir}")
-                # Skip any non-ctu directories
-                cdpath = subdir + "/"
-                # print(f"\t\tcdpath: {cdpath}")
+            # Create empty dict for all files from one group
+            parts = {}  # level_name -> df_full
 
-                # Find log file(s) in sub-directory
-                files = glob(cdpath + file_glob_str)
-                if len(files) == 0:
-                    print(f"WARNING. Could not find any files using glob string: {file_glob_str} on path: {cdpath}")
-                    continue
-                if len(files) > 1:
-                    print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]} on path: {cdpath}")
-                    process_file = files[0]
-                else:
-                    process_file = files[0]
+            # Loop all files for this group
+            for file_glob_str in file_glob_strs:
+                print(f"\t\tprocessing {file_glob_str}")
 
-                # Parse log, force or history file
-                if 'log' in file_glob_str:
-                    df_file = parse_log_file(process_file)
-                elif file_glob_str.endswith('.fce'):
-                    df_file = get_data_frame(
-                        process_file,
-                        skip_start=force_file_skip_start,
-                        skip_end=force_file_skip_end,
-                    )
-                elif file_glob_str.endswith('.his'):
-                    df_file = get_data_frame(
-                        process_file,
-                        skip_start=force_file_skip_start,
-                        skip_end=force_file_skip_end,
-                    )
-                else:
-                    df_file = get_data_frame(
-                        process_file,
-                        skip_start=force_file_skip_start,
-                        skip_end=force_file_skip_end,
-                    )
+                # Create empty dataframe for this file(-type)
+                df_full = pd.DataFrame()
 
-                # Copy initial dataframe or concatenate parsed logs
+                # Loop through all subdirectories, read files and merge all data
+                for subdir in subdirs:
+                    # Verbose print
+                    # print(f"\tProcessing sub-directory {subdir}")
+
+                    # Find log file(s) in sub-directory
+                    process_file = find_process_file(subdir, file_glob_str)
+
+                    # Parse log, force or history file
+                    df_subdir = read_file(file_glob_str, process_file)
+
+
+                    # Copy initial dataframe or concatenate parsed logs
+                    if df_full.empty:
+                        df_full = df_subdir
+                    else:
+                        df_full = pd.concat([df_full, df_subdir], axis=0, ignore_index=True)
+
                 if df_full.empty:
-                    df_full = df_file
-                else:
-                    df_full = pd.concat([df_full, df_file], axis=0, ignore_index=True)
+                    print(f"WARNING. Could not find any files to process. Skipping files for {file_glob_str}.")
+                    continue
 
-            if df_full.empty:
-                print(f"WARNING. Could not find any files to process. Skipping files for {file_glob_str}.")
-                continue
+                # df_full.to_csv(full_directory_path + output_name, index=False)
 
-            if 'log' in file_glob_str:
-                df_full.to_csv(full_directory_path + "log_info.csv", index=False)
-            else:
-                savename = file_glob_str.replace(".", "-process.")
-                if force_file_skip_start != -1:
-                    savename = savename.replace("-process.", f"-process-overlap-{force_file_skip_start}.")
-                df_full.to_csv(full_directory_path + savename, index=False)
+                # Debug print/plot
+                if DEBUG:
+                    # print(df_full)
+                    if "TOTAL" in file_glob_str:
+                        df_full.plot(x='Time', y=customMetrics[-1], label=directory_name, kind='scatter', title=output_name)
+                    if "log" in file_glob_str:
+                        df_full.plot(y='phys_time', label=directory_name, title=output_name)
 
-            # Debug print/plot
-            if DEBUG:
-                # print(df_full)
-                if "TOTAL" in file_glob_str:
-                    df_full.plot(x='Time', y=customMetrics[-1], label=directory_name, kind='scatter')
-                if "log" in file_glob_str:
-                    df_full.plot(y='phys_time', label=directory_name)
+                # Get level_name for this file and add to parts dict
+                level_name = file_glob_str.split(".")[0]
+                parts[level_name] = df_full
 
-            # Clear memory
-            del df_full
-            del df_file
+                # Clear memory
+                del df_subdir
+                del df_full
+
+            # Concatenate all dataframes with keys = level_name(s)
+            df_all = pd.concat(parts, axis=1)  # keys come from dict keys
+            print(f"\tWriting {output_name} to directory {full_directory_path} ...")
+            df_all.to_pickle(full_directory_path + output_name + ".pkl")
+
+            # Ce
+            del df_all
+
+
 
     # Debug print/plot
     if DEBUG:

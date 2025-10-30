@@ -7,6 +7,9 @@ from glob import glob
 import numpy as np
 import pandas as pd
 import matplotlib
+
+from preprocessor import find_subdirs, find_process_file, read_file
+
 matplotlib.use('qtagg')
 import matplotlib.pyplot as plt
 
@@ -15,13 +18,12 @@ from config import (
     directory_names,
     force_file_skip_start,
     force_file_skip_end,
-    log_file_glob_str,
+    log_file_glob_strs,
     use_iterations,
     DEBUG,
     scaling,
     customMetrics,
 )
-from utilities import get_data_frame
 
 
 # Do not use CFL for scaling
@@ -74,7 +76,8 @@ def adjust_info_length(step_info, cfl_info = [[]], iter_info = [[]]):
             # Updated phys_time
             dt = (step_info[1][1] - step_info[1][0]) / (io_infosteps)
             initial_phys_time = step_info[1][0] - io_infosteps * dt
-            print(f"dt = {dt}, initial_phys_time = {initial_phys_time}")
+            final_phys_time = step_info[1][-1]
+            print(f"dt = {dt}, initial_phys_time = {initial_phys_time}, final_phys_time = {final_phys_time}, durations = {final_phys_time - initial_phys_time}")
             new_step_info.append(
                 [initial_phys_time + i * dt for i in range(len_max)]
             )
@@ -293,18 +296,30 @@ def test_parse_log_file():
         print('Meta info:', i, type(i), len(df_log[i]))
 
 
-# TODO extend this for History point files (justify time-averaging windows)
+
 # TODO extend this for Energy (3D) files
 if __name__ == "__main__":
-    # Only log files are needed for scaling analysis
-    file_glob_strs = [log_file_glob_str]
+    # Combine log, force and history file patterns
+    all_file_glob_strs = []
+    output_names = []
+    if len(log_file_glob_strs) > 0:
+        all_file_glob_strs += [log_file_glob_strs]
+        output_names += ["log_info"]
 
-    for file_glob_str in file_glob_strs:
-        # Loop all directories (cases)
-        for directory_name in directory_names:
-            # Create empty dataframe for this file(-type)
-            df_full = pd.DataFrame()
-            df_file = pd.DataFrame()
+    # Loop all directories (cases)
+    for directory_name in directory_names:
+        print(f"Processing directory {directory_name}")
+        full_directory_path = path_to_directories + directory_name
+
+        # Loop all groups of files to be processed (log, force, history, ...)
+        for output_name, file_glob_strs in zip(output_names, all_file_glob_strs):
+            print(f"\tglob string {output_name}")
+
+            # Process only a single glob string for log file
+            file_glob_str = file_glob_strs[0]
+
+            # Create empty dict for all files from one group
+            parts = {}  # level_name -> df_full
 
             # Verbose print
             full_directory_path = path_to_directories + directory_name
@@ -320,20 +335,19 @@ if __name__ == "__main__":
                 print(f"\tProcessing node-directory {node_directory_path}")
 
                 # Find log file(s) in sub-directory
-                files = glob(node_directory_path + file_glob_str)
-                files = [file for file in files if not "log_info.csv" in file]
-                if len(files) == 0:
-                    print(f"WARNING. Could not find any files using glob string: {file_glob_str} on path: {node_directory_path}")
+                process_file = find_process_file(node_directory_path, file_glob_str)
+                if process_file is None:
+                    print(f"\t\tNo {file_glob_str} file found in {node_directory_path}. Skipping.")
                     continue
-                if len(files) > 1:
-                    print(f"WARNING. Could not identify unique file in list: {files}. Using the first file: {files[0]} on path: {node_directory_path}")
-                    process_file = files[0]
-                else:
-                    process_file = files[0]
 
                 # Parse log or forces file
-                df_file = parse_log_file(process_file)
-                df_file.to_csv(node_directory_path + "log_info.csv", index=False)
+                df_file = read_file(file_glob_str, process_file)
+
+                # Save similar to preprocessor for convenience
+                level_name = file_glob_str
+                parts[level_name] = df_file
+                df_all = pd.concat(parts, axis=1)  # keys come from dict keys
+                df_all.to_pickle(node_directory_path + output_name + ".pkl")
 
                 # Debug print/plot
                 if DEBUG:

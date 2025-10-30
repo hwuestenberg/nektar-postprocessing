@@ -1,4 +1,6 @@
 # Matplotlib setup with latex
+import os
+
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
@@ -26,6 +28,8 @@ from config import (
     force_file_skip_start,
 )
 
+
+############################
 ####### SCRIPT USER INPUTS
 # Choose lift or drag
 metric = 'u'
@@ -33,6 +37,7 @@ metric = 'u'
 time = 8.0
 
 file = history_file_glob_strs[0]
+file_noext = file.split('.')[0]
 averaging_len = 4.1 # [CTU] redundant due to MSER, just use large number
 
 n_downsample = 2
@@ -140,8 +145,13 @@ if __name__ == "__main__":
         # Setup paths
         full_directory_path = path_to_directories + dirname
         file_extension = "." + file.split('.')[-1]
-        filename = file.replace(file_extension, f"-process-overlap-{force_file_skip_start}{file_extension}")
-        full_file_path = full_directory_path + filename
+        # filename = file.replace(file_extension, f"-process-overlap-{force_file_skip_start}{file_extension}")
+        full_file_path = full_directory_path + "historypoints.pkl"
+
+        # Check if file exists
+        if not os.path.exists(full_file_path):
+            print(f"File {full_file_path} does not exist. Skipping.")
+            continue
 
         # Get time step size
         # Note for James' data, we cannot detect 4e-6 from force file
@@ -153,8 +163,10 @@ if __name__ == "__main__":
         print("\nProcessing {0}...".format(label))
 
         # Read file
-        df = pd.read_csv(full_file_path, sep=',')
-        npoints = int(len(df['Time']) / len(df['Time'].unique()))
+        # df = pd.read_csv(full_file_path, sep=',')
+        df = pd.read_pickle(full_file_path)
+        df = df[file_noext].dropna()
+        npoints = len(df.index.unique('point'))
 
 
         if fft_in_space:
@@ -203,7 +215,7 @@ if __name__ == "__main__":
                 savename += f"loc-{i}"
 
                 # Extract time series for a given point
-                dfi = df.iloc[i::npoints]
+                dfi = df.xs(i, level='point')
 
                 # Extract time and data
                 physTime = dfi["Time"]

@@ -14,13 +14,13 @@ import pandas as pd
 from scipy import signal
 
 from utilities import get_time_step_size, get_label, mser, plot_cumulative_mean_std, filter_time_interval
-from config import directory_names, path_to_directories, ref_area, ctu_len, save_directory
+from config import directory_names, path_to_directories, ref_area, ctu_len, save_directory, log_file_glob_strs
 
 ####### SCRIPT USER INPUTS
 # Choose lift [1] or drag [0]
-metric = 'cfl'
+metric = 'cpu_time'
 
-log_file = "log_info.csv"
+log_file = "log_info.pkl"
 signal_len_from_end = 30.0 # in CTUs
 use_mser = False
 
@@ -67,7 +67,11 @@ if __name__ == "__main__":
         print("\nProcessing {0}...".format(label))
 
         # Read file
-        df = pd.read_csv(full_file_path, sep=',')
+        # df = pd.read_csv(full_file_path, sep=',')
+        df = pd.read_pickle(full_file_path)
+        df = df[log_file_glob_strs[0]]
+
+        print("Possible metrics found in file:", df.keys())
 
         # Extract time and data
         physTime = df["phys_time"]
