@@ -12,6 +12,7 @@ from matplotlib.ticker import FormatStrFormatter
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 import os
 from glob import glob
@@ -32,7 +33,7 @@ process_file = "log_info.pkl"
 
 log_str = log_file_glob_strs[0]
 
-savename = f"implicit-scaling"
+savename = f"implicit-iterations"
 savename = save_directory + savename
 
 nodes_ref = int(32)
@@ -47,24 +48,24 @@ ylim_su = []
 if __name__ == "__main__":
 
     # Create figure and axes
-    fig = plt.figure(figsize=(6, 4))
-    ax_dt = fig.add_subplot(211)
-    ax_su = fig.add_subplot(212, sharex=ax_dt)
+    fig = plt.figure(figsize=(6, 2.7))
+    ax_it_uvw = fig.add_subplot(211)
+    ax_it_p = fig.add_subplot(212, sharex=ax_it_uvw)
 
-    ylabel = r"Comp. time per CTU"
-    ax_dt.set_ylabel(ylabel)
-    ax_dt.set_yscale('log')
+    ylabel = r"$\overline{ u + v + w }$"
+    ax_it_uvw.set_ylabel(ylabel)
+    ax_it_uvw.set_yscale('linear')
 
-    ylabel = r"Speed Up"# $S = T(N_P=1)/T(N_{P}=P)$"
-    ax_su.set_ylabel(ylabel)
-    ax_su.set_yscale('log')
+    ylabel = r"$\overline{p}$"
+    ax_it_p.set_ylabel(ylabel)
+    ax_it_p.set_yscale('linear')
 
-    ax_su.set_xlabel(r"Time step increase $\times \Delta t_{CFL}$")
-    ax_su.set_xscale("log")
-    # ax_pe.xaxis.set_major_formatter(FormatStrFormatter('%d'))
+    ax_it_p.set_xlabel(r"Time step increase $\times \Delta t_{CFL}$")
+    ax_it_p.set_xscale("log")
+    ax_it_p.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
-    ax_dt.grid(which='both', axis='both')
-    ax_su.grid(which='both', axis='both')
+    ax_it_uvw.grid(which='both', axis='both')
+    ax_it_p.grid(which='both', axis='both')
 
 
     # Dataframe for gathering statistics for each case
@@ -156,20 +157,30 @@ if __name__ == "__main__":
                     metricData = df["iterations_u"] + df["iterations_v"] + df["iterations_w"]
 
                 # Add statistics to dict
-                case_dict[f'{ref_metric}-mean'] = metricData.mean()
-                case_dict[f'{ref_metric}-std'] = metricData.std()
+                case_dict[f'{metric}-mean'] = metricData.mean()
+                case_dict[f'{metric}-std'] = metricData.std()
+                confidence = 0.95
+                n = len(metricData)
+                sem = metricData.std() / np.sqrt(n)
+                t = stats.t.ppf((1 + confidence) / 2, df=n - 1)
+                ci = sem * t
+                case_dict[f'{metric}-ci95'] = ci
 
             # Transform to DataFrame and concatenate
             df_case = pd.DataFrame([case_dict])
             df_stat = pd.concat([df_stat, df_case], axis=0, ignore_index=True)
 
-        # Verbose check concatenation
-        print(df_stat)
+    # Verbose check concatenation
+    print(df_stat)
 
 
     # Filter minimum nodes
     nodes_min = df_stat['nodes'].min()
-    df_ref = df_stat.loc[df_stat['scheme'] == "semi-implicit"].loc[df_stat['nodes'] == nodes_ref]
+    dt_min = df_stat['dt'].min()
+    ref_scheme = 'semi-implicit'
+    df_ref = df_stat.loc[df_stat['scheme'] == ref_scheme].loc[df_stat['nodes'] == nodes_ref]
+    if len(df_ref) == 0:
+        raise ValueError(f"No reference data found for scheme: {ref_scheme} using nodes {nodes_ref}")
 
     # Add ideal reference lines
     x_unique = df_stat[x_ref].round(7).unique()
@@ -184,33 +195,28 @@ if __name__ == "__main__":
         df_node = df_stat.loc[df_stat['nodes'] == nodes_ref]
         df_scheme = df_node.loc[df_stat['scheme'] == scheme]
 
-        # Comp. time per CTU
-        dt = df_scheme[f'{metric}-mean']
+        # Compute number of iterations
+        uvw_mean = df_scheme['iterations_uvw-mean']
+        uvw_std = df_scheme['iterations_uvw-std']
+        uvw_ci = df_scheme['iterations_uvw-ci95']
 
-        # Compute speed-up relative to semi-implicit
-        su = df_ref[f'{metric}-mean'].iloc[0] / df_scheme[f'{metric}-mean']
+        p_mean = df_scheme['iterations_p-mean']
+        p_std = df_scheme['iterations_p-std']
+        p_ci = df_scheme['iterations_p-ci95']
 
         # Choose x-reference
         x_val = df_scheme[x_ref]
         if x_ref == "nodes":
             x_val = df_scheme['nodes'] / nodes_min
-
-        # # Add ideal reference for comp. time per dt
-        # dt_label = 'ideal'
-        # if scheme_color != list(TABLEAU_COLORS)[0]:
-        #     dt_label = ''
-        # ax_dt.plot(x_val, dt.iloc[0] / ideal_su, linestyle='--', color='black', label=dt_label)
+        if x_ref == "dt":
+            x_val = x_val / dt_min
 
         # Plot
-        ax_dt.plot(x_val, dt, marker='o', label=scheme)
-        ax_su.plot(x_val, su, marker='o', label=scheme)
+        ax_it_uvw.plot(x_val, uvw_mean, marker='o', label=scheme + " velocity", color=scheme_color)
+        ax_it_p.plot(x_val, p_mean, marker='o', label=scheme + " pressure", linestyle='dashed', color=scheme_color)
 
-        # # With error bars
-        # rel_err = df_scheme[f'{metric}-std']
-        # yerr_lower = dt - dt / (1 + rel_err)
-        # yerr_upper = dt * (1 + rel_err) - dt
-        # ax_dt.errorbar(x_val, dt, yerr=[yerr_lower, yerr_upper], fmt='o', linestyle='None',
-        #             color=scheme_color, capsize=4)
+        # ax_it_uvw.errorbar(x_val, uvw_mean, yerr=uvw_ci, marker='o', label=scheme + " velocity", color=scheme_color, capsize=5)
+        # ax_it_p.errorbar(x_val, p_mean, yerr=p_std, marker='o', label=scheme + " pressure", linestyle='dashed', color=scheme_color)
 
     ## Aesthetics
     # # Set x/y-limits
@@ -225,8 +231,7 @@ if __name__ == "__main__":
     # ax_su.set_ylim(ylim_su)
     # ax_pe.set_ylim(ylim_pe)
 
-
-    ax_dt.legend()
+    ax_it_uvw.legend()
 
 
     # Save data

@@ -47,29 +47,31 @@ ylim_su = []
 if __name__ == "__main__":
 
     # Create figure and axes
-    fig = plt.figure(figsize=(6, 4))
-    ax_dt = fig.add_subplot(311)
-    ax_su = fig.add_subplot(312, sharex=ax_dt)
-    ax_it = fig.add_subplot(313, sharex=ax_dt)
+    fig = plt.figure(figsize=(6, 2.7))
+    ax_dt = fig.add_subplot(211)
+    ax_su = fig.add_subplot(212, sharex=ax_dt)
+    # ax_it = fig.add_subplot(313, sharex=ax_dt)
 
-    ylabel = r"Comp. time per CTU"
+    ylabel = r"Comp. time per CTU [h]"
     ax_dt.set_ylabel(ylabel)
     ax_dt.set_yscale('log')
 
     ylabel = r"Speed Up"# $S = T(N_P=1)/T(N_{P}=P)$"
     ax_su.set_ylabel(ylabel)
     ax_su.set_yscale('log')
+    ax_su.yaxis.set_major_formatter(FormatStrFormatter('%d'))
 
     ylabel = r"Sum of velocity iterations"  # $S = T(N_P=1)/T(N_{P}=P)$"
-    ax_it.set_ylabel(ylabel)
-    ax_it.set_yscale('linear')
+    # ax_it.set_ylabel(ylabel)
+    # ax_it.set_yscale('linear')
 
     ax_su.set_xlabel(r"Time step increase $\times \Delta t_{CFL}$")
     ax_su.set_xscale("log")
+    ax_su.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
     ax_dt.grid(which='both', axis='both')
     ax_su.grid(which='both', axis='both')
-    ax_it.grid(which='both', axis='both')
+    # ax_it.grid(which='both', axis='both')
 
 
     # Dataframe for gathering statistics for each case
@@ -134,7 +136,6 @@ if __name__ == "__main__":
             # Safe conversion to numeric
             df = df.apply(pd.to_numeric)
 
-
             # Remove initial 10% of data (this includes setup)
             npoints = len(df)
             npoints_remove = int(0.1 * npoints)
@@ -167,13 +168,17 @@ if __name__ == "__main__":
             df_case = pd.DataFrame([case_dict])
             df_stat = pd.concat([df_stat, df_case], axis=0, ignore_index=True)
 
-        # Verbose check concatenation
-        print(df_stat)
+    # Verbose check concatenation
+    print(df_stat)
 
 
     # Filter minimum nodes
     nodes_min = df_stat['nodes'].min()
-    df_ref = df_stat.loc[df_stat['scheme'] == "semi-implicit"].loc[df_stat['nodes'] == nodes_ref]
+    dt_min = df_stat['dt'].min()
+    ref_scheme = 'semi-implicit'
+    df_ref = df_stat.loc[df_stat['scheme'] == ref_scheme].loc[df_stat['nodes'] == nodes_ref]
+    if len(df_ref) == 0:
+        raise ValueError(f"No reference data found for scheme: {ref_scheme} using nodes {nodes_ref}")
 
     # Add ideal reference lines
     x_unique = df_stat[x_ref].round(7).unique()
@@ -186,7 +191,7 @@ if __name__ == "__main__":
         df_scheme = df_node.loc[df_stat['scheme'] == scheme]
 
         # Comp. time per CTU
-        dt = df_scheme[f'{plot_metric}-mean']
+        dt = df_scheme[f'{plot_metric}-mean'] / 3600
 
         # Compute speed-up relative to semi-implicit
         su = df_ref[f'{plot_metric}-mean'].iloc[0] / df_scheme[f'{plot_metric}-mean']
@@ -199,18 +204,14 @@ if __name__ == "__main__":
         x_val = df_scheme[x_ref]
         if x_ref == "nodes":
             x_val = df_scheme['nodes'] / nodes_min
-
-        # # Add ideal reference for comp. time per dt
-        # dt_label = 'ideal'
-        # if scheme_color != list(TABLEAU_COLORS)[0]:
-        #     dt_label = ''
-        # ax_dt.plot(x_val, dt.iloc[0] / ideal_su, linestyle='--', color='black', label=dt_label)
+        if x_ref == "dt":
+            x_val = x_val / dt_min
 
         # Plot
         ax_dt.plot(x_val, dt, marker='o', label=scheme)
         ax_su.plot(x_val, su, marker='o', label=scheme)
 
-        ax_it.plot(x_val, it_uvw, marker='o', label=scheme + " velocity", color=scheme_color)
+        # ax_it.plot(x_val, it_uvw, marker='o', label=scheme + " velocity", color=scheme_color)
         # ax_it.plot(x_val, it_p, marker='o', label=scheme + " pressure", linestyle='dashed', color=scheme_color)
 
         # # With error bars
