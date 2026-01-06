@@ -23,7 +23,7 @@ process_file = "log_info.pkl"
 
 log_str = log_file_glob_strs[0]
 
-savename = f"implicit-iterations"
+savename = f"implicit-substeps"
 savename = save_directory + savename
 
 nodes_ref = int(32)
@@ -33,23 +33,17 @@ x_ref = 'dt'
 if __name__ == "__main__":
     # Create figure and axes
     fig = plt.figure(figsize=(6, 2.7))
-    ax_it_uvw = fig.add_subplot(211)
-    ax_it_p = fig.add_subplot(212, sharex=ax_it_uvw)
+    ax_substeps = fig.add_subplot(111)
 
-    ylabel = r"$\\overline{ u + v + w }$"
-    ax_it_uvw.set_ylabel(ylabel)
-    ax_it_uvw.set_yscale("linear")
+    ylabel = r"$\\overline{\\mathrm{substeps}}$"
+    ax_substeps.set_ylabel(ylabel)
+    ax_substeps.set_yscale("linear")
 
-    ylabel = r"$\\overline{p}$"
-    ax_it_p.set_ylabel(ylabel)
-    ax_it_p.set_yscale("linear")
+    ax_substeps.set_xlabel(r"Time step increase $\\times \\Delta t_{CFL}$")
+    ax_substeps.set_xscale("log")
+    ax_substeps.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
-    ax_it_p.set_xlabel(r"Time step increase $\\times \\Delta t_{CFL}$")
-    ax_it_p.set_xscale("log")
-    ax_it_p.xaxis.set_major_formatter(FormatStrFormatter('%d'))
-
-    ax_it_uvw.grid(which="both", axis="both")
-    ax_it_p.grid(which="both", axis="both")
+    ax_substeps.grid(which="both", axis="both")
 
     # Dataframe for gathering statistics for each case
     df_stat = pd.DataFrame(
@@ -69,7 +63,7 @@ if __name__ == "__main__":
         path_to_directories,
         process_file,
         log_str,
-        additional_metrics=["ctu_time", "iterations_uvw"],
+        additional_metrics=["ctu_time"],
         ctu_len=ctu_len,
         compute_ci=True,
     ):
@@ -91,20 +85,15 @@ if __name__ == "__main__":
             f"No reference data found for scheme: {ref_scheme} using nodes {nodes_ref}"
         )
 
-    # Plot by scheme: speedup
+    # Plot by scheme
     for scheme, scheme_color in zip(df_stat["scheme"].unique(), TABLEAU_COLORS):
         # Extract data for this plot
         df_node = df_stat.loc[df_stat["nodes"] == nodes_ref]
         df_scheme = df_node.loc[df_node["scheme"] == scheme]
 
-        # Compute number of iterations
-        uvw_mean = df_scheme["iterations_uvw-mean"]
-        uvw_std = df_scheme["iterations_uvw-std"]
-        uvw_ci = df_scheme["iterations_uvw-ci95"]
-
-        p_mean = df_scheme["iterations_p-mean"]
-        p_std = df_scheme["iterations_p-std"]
-        p_ci = df_scheme["iterations_p-ci95"]
+        # Compute number of substeps
+        substeps_mean = df_scheme["substeps-mean"]
+        substeps_ci = df_scheme["substeps-ci95"] if "substeps-ci95" in df_scheme else None
 
         # Choose x-reference
         x_val = df_scheme[x_ref]
@@ -114,26 +103,17 @@ if __name__ == "__main__":
             x_val = x_val / dt_min
 
         # Plot
-        ax_it_uvw.plot(
-            x_val,
-            uvw_mean,
-            marker="o",
-            label=scheme + " velocity",
-            color=scheme_color,
-        )
-        ax_it_p.plot(
-            x_val,
-            p_mean,
-            marker="o",
-            label=scheme + " pressure",
-            linestyle="dashed",
-            color=scheme_color,
-        )
+        ax_substeps.plot(x_val, substeps_mean, marker="o", label=scheme, color=scheme_color)
+        if substeps_ci is not None:
+            ax_substeps.fill_between(
+                x_val,
+                substeps_mean - substeps_ci,
+                substeps_mean + substeps_ci,
+                color=scheme_color,
+                alpha=0.2,
+            )
 
-        # ax_it_uvw.errorbar(x_val, uvw_mean, yerr=uvw_ci, marker='o', label=scheme + " velocity", color=scheme_color, capsize=5)
-        # ax_it_p.errorbar(x_val, p_mean, yerr=p_std, marker='o', label=scheme + " pressure", linestyle='dashed', color=scheme_color)
-
-    ax_it_uvw.legend()
+    ax_substeps.legend()
 
     # Save data
     plt.savefig(savename + ".pdf", bbox_inches="tight")
