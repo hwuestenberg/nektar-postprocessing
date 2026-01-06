@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator
 
 params = {'text.usetex': True,
- 'font.size' : 10,
-}
+          'font.size': 10}
 plt.rcParams.update(params)
 from matplotlib.colors import TABLEAU_COLORS
 from matplotlib.ticker import FormatStrFormatter
@@ -16,11 +15,13 @@ import pandas as pd
 import os
 from glob import glob
 
-from utilities import get_time_step_size, mser, get_label, get_scheme, get_dof
+from npp.implicit_common import iter_implicit_cases
 from config import (
     directory_names,
     path_to_directories,
-    save_directory, log_file_glob_strs, ctu_len,
+    save_directory,
+    log_file_glob_strs,
+    ctu_len,
 )
 
 
@@ -62,104 +63,29 @@ if __name__ == "__main__":
 
 
     # Dataframe for gathering statistics for each case
-    df_stat = pd.DataFrame(columns=[
-        "scheme",
-        "dt",
-        "ncpu",
-        "nodes",
-        "ncpus",
-        "global_dof_per_rank",
-        "local_dof_per_rank",
-    ])
+    df_stat = pd.DataFrame(
+        columns=[
+            "scheme",
+            "dt",
+            "ncpu",
+            "nodes",
+            "ncpus",
+            "global_dof_per_rank",
+            "local_dof_per_rank",
+        ]
+    )
 
-
-    # Loop all files
-    for dirname in directory_names:
-        # Only process substepping cases
-        if not "substepping" in dirname:
-            continue
-
-        # Setup paths
-        full_directory_path = path_to_directories + dirname
-
-        # use replace to change to scaling directory
-        full_directory_path = full_directory_path.replace("physics", "scaling")
-        node_directories = [x for x in os.walk(full_directory_path)][0][1]
-        # Remove that have not been preprocessed yet
-        node_directories = [x for x in node_directories if len(glob(full_directory_path + x + "/" + process_file)) == 1]
-        nodes = sorted([int(x.split("x")[0]) for x in node_directories])
-        n_cpus = max([int(x.split("x")[1]) for x in node_directories])
-
-        # Create dictionary for gathering data
-        case_dict = {'scheme': get_scheme(full_directory_path)}
-
-        # Loop each node-directory in sorted order
-        for n_nodes in nodes:
-            print(f"\treading {n_nodes}x{n_cpus}")
-
-            # Get number of cpus and nodes
-            case_dict['ncpu'] = n_cpus
-            case_dict['nodes'] = n_nodes
-            case_dict['ncpus'] = n_cpus * n_nodes
-
-            # Add processed file name
-            node_directory_path = full_directory_path + f"{n_nodes}x{n_cpus}/"
-            full_file_path = node_directory_path + process_file
-
-            # Get number of local/global DoF
-            get_dof(case_dict, node_directory_path)
-            case_dict['global_dof_per_rank'] = case_dict['global_dof'] / case_dict['ncpus']
-            case_dict['local_dof_per_rank'] = case_dict['local_dof'] / case_dict['ncpus']
-
-            # Get time step size
-            dt = get_time_step_size(node_directory_path)
-            case_dict['dt'] = dt
-
-            # Get plot styling
-            label, marker, mfc, ls, color = get_label(node_directory_path, dt)
-            print("\nProcessing {0}...".format(label))
-
-            # Read file
-            # df = pd.read_csv(full_file_path, sep=',')
-            df = pd.read_pickle(full_file_path)
-            df = df[log_str]
-
-            # Safe conversion to numeric
-            df = df.apply(pd.to_numeric)
-
-
-            # Remove initial 10% of data (this includes setup)
-            npoints = len(df)
-            npoints_remove = int(0.1 * npoints)
-            df = df.iloc[npoints_remove:]
-
-            # Process all metrics and append to case_dict
-            additional_metrics = ["ctu_time", "iterations_uvw"]
-            metrics = df.columns.to_list() + additional_metrics
-            for metric in metrics:
-                # Extract signal (check for special cases)
-                ref_metric = metric
-                if metric == "ctu_time":
-                    ref_metric = "cpu_time"
-                elif metric == "iterations_uvw":
-                    ref_metric = "iterations_u"
-                metricData = df[ref_metric]
-
-
-                # Compute time-to-solution (aka per CTU)
-                if metric == "ctu_time":
-                    num_time_steps = ctu_len / dt
-                    metricData = metricData * num_time_steps
-                elif metric == "iterations_uvw":
-                    metricData = df["iterations_u"] + df["iterations_v"] + df["iterations_w"]
-
-                # Add statistics to dict
-                case_dict[f'{metric}-mean'] = metricData.mean()
-                case_dict[f'{metric}-std'] = metricData.std()
-
-            # Transform to DataFrame and concatenate
-            df_case = pd.DataFrame([case_dict])
-            df_stat = pd.concat([df_stat, df_case], axis=0, ignore_index=True)
+    for case_data in iter_implicit_cases(
+        directory_names,
+        path_to_directories,
+        process_file,
+        log_str,
+        additional_metrics=["ctu_time"],
+        ctu_len=ctu_len,
+        compute_ci=True,
+    ):
+        df_case = pd.DataFrame([case_data])
+        df_stat = pd.concat([df_stat, df_case], axis=0, ignore_index=True)
 
     # Verbose check concatenation
     print(df_stat)
@@ -171,7 +97,10 @@ if __name__ == "__main__":
     ref_scheme = 'sub-stepping'
     df_ref = df_stat.loc[df_stat['scheme'] == ref_scheme].loc[df_stat['nodes'] == nodes_ref]
     if len(df_ref) == 0:
-        raise ValueError(f"No reference data found for scheme: {ref_scheme} using nodes {nodes_ref}")
+        raise ValueError(
+            f"No reference data found for scheme: {ref_scheme} using nodes {nodes_ref}"
+        )
+
 
     # Add ideal reference lines
     x_unique = df_stat[x_ref].round(7).unique()
@@ -180,36 +109,33 @@ if __name__ == "__main__":
     # ax_pe.plot(x_unique, np.ones_like(x_unique), linestyle='--', color='black', label='ideal')
 
 
-    # Plot by scheme: speedup
-    for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
-        # enforce green color
-        scheme_color = 'tab:green'
-
+    # Plot by scheme
+    for scheme, scheme_color in zip(df_stat["scheme"].unique(), TABLEAU_COLORS):
         # Extract data for this plot
-        df_node = df_stat.loc[df_stat['nodes'] == nodes_ref]
-        df_scheme = df_node.loc[df_stat['scheme'] == scheme]
+        df_node = df_stat.loc[df_stat["nodes"] == nodes_ref]
+        df_scheme = df_node.loc[df_node["scheme"] == scheme]
 
-        # Compute number of iterations
-        mean = df_scheme['substeps-mean']
-        std = df_scheme['substeps-std']
+        # Compute number of substeps
+        mean = df_scheme["substeps-mean"]
+        ci = df_scheme["substeps-ci95"] if "substeps-ci95" in df_scheme else None
 
         # Choose x-reference
         x_val = df_scheme[x_ref]
         if x_ref == "nodes":
-            x_val = df_scheme['nodes'] / nodes_min
+            x_val = df_scheme["nodes"] / nodes_min
         if x_ref == "dt":
             x_val = x_val / dt_min
 
         # Plot
         ax_sub.plot(x_val, mean, marker='o', label=scheme + " substeps", color=scheme_color)
-        # ax_it_p.plot(x_val, it_p, marker='o', label=scheme + " pressure", linestyle='dashed', color=scheme_color)
-
-        # # With error bars
-        # rel_err = df_scheme[f'{metric}-std']
-        # yerr_lower = dt - dt / (1 + rel_err)
-        # yerr_upper = dt * (1 + rel_err) - dt
-        # ax_dt.errorbar(x_val, dt, yerr=[yerr_lower, yerr_upper], fmt='o', linestyle='None',
-        #             color=scheme_color, capsize=4)
+        if substeps_ci is not None:
+            ax_sub.fill_between(
+                x_val,
+                substeps_mean - substeps_ci,
+                substeps_mean + substeps_ci,
+                color=scheme_color,
+                alpha=0.2,
+            )
 
     ## Aesthetics
     # Set x/y-limits
@@ -222,7 +148,6 @@ if __name__ == "__main__":
 
 
     ax_sub.legend()
-
 
     # Save data
     plt.savefig(savename + ".pdf", bbox_inches='tight')
