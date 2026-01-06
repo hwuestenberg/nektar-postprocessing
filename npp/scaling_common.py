@@ -41,7 +41,11 @@ def iter_scaling_nodes(
         if not scaling_dir.exists():
             continue
 
-        for node_dir in sorted(p for p in scaling_dir.iterdir() if p.is_dir()):
+        node_dirs = [p for p in scaling_dir.iterdir() if p.is_dir()]
+        node_dirs.sort(key=lambda p: int(p.name.split("x")[0]))
+
+
+        for node_dir in node_dirs:
             if not list(node_dir.glob(required_pattern)):
                 continue
 
