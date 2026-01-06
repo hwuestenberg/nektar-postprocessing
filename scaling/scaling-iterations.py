@@ -5,6 +5,7 @@ import sys
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
+from matplotlib.ticker import FormatStrFormatter
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -56,7 +57,11 @@ if __name__ == "__main__":
 
     ylabel = "Mean iteration counts +/- max and min"
     ax.set_ylabel(ylabel)
+    ax.set_yscale("log")
     ax.grid(which='both', axis='both')
+
+    ax.set_xlabel(r"Number of Processors $N_{P}$")
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%d'))
 
     df_stat = pd.DataFrame(columns=[*base_columns, *metric_columns])
 
@@ -89,7 +94,8 @@ if __name__ == "__main__":
     for scheme, scheme_color in zip(df_stat['scheme'].unique(), TABLEAU_COLORS):
         df_plot = df_stat.loc[df_stat['scheme'] == scheme]
 
-        for metric, ls in zip(metrics, ['solid', 'dashed', 'dotted', 'dashdot']):
+        for metric, metric_color in zip(metrics, TABLEAU_COLORS):
+            ls = 'solid'
             mean = df_plot[f'{metric}-mean']
             max_val = df_plot[f'{metric}-max']
             min_val = df_plot[f'{metric}-min']
@@ -101,7 +107,7 @@ if __name__ == "__main__":
                 yerr=[mean - min_val, max_val - mean],
                 capsize=4,
                 label=scheme + " " + metric,
-                color=scheme_color,
+                color=metric_color,
                 linestyle=ls,
             )
 
