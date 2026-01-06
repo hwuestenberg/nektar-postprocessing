@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import welch
 
-from utilities import get_time_step_size, get_label, mser, filter_time_interval, check_sampling_rates
+from case_processing import iter_case_metadata
 from config import (
     directory_names,
     path_to_directories,
@@ -77,30 +77,17 @@ if __name__ == "__main__":
     ax.grid(True, which='both', axis='both')
 
     # Loop all files
-    for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
-        # Setup paths
-        full_directory_path = path_to_directories + dirname
-        file_extension = "." + file.split('.')[-1]
-        # filename = file.replace(file_extension, f"-process-overlap-{force_file_skip_start}{file_extension}")
-        full_file_path = full_directory_path + "historypoints.pkl"
-
-        # Check if file exists
-        if not os.path.exists(full_file_path):
-            print(f"File {full_file_path} does not exist. Skipping.")
-            continue
-
-        # Get time step size
-        # Note for James' data, we cannot detect 4e-6 from force file
-        # because the sampling rate is set to 4e-5
-        dt = get_time_step_size(full_directory_path)
-
-        # Get plot styling
-        label, marker, mfc, ls, color = get_label(full_file_path, dt, color=dir_color)
+    for metadata in iter_case_metadata(
+        file_name="historypoints.pkl",
+        directory_names=directory_names,
+        base_path=path_to_directories,
+    ):
+        dt = metadata.dt
+        label = metadata.label
         print("\nProcessing {0}...".format(label))
 
         # Read file
-        # df = pd.read_csv(full_file_path, sep=',')
-        df = pd.read_pickle(full_file_path)
+        df = pd.read_pickle(metadata.file_path)
         df = df[file_noext].dropna()
         npoints = len(df.index.unique('point'))
 

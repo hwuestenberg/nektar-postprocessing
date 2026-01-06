@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import welch
 
-from utilities import get_time_step_size, get_label, mser, filter_time_interval, check_sampling_rates
+from case_processing import iter_force_cases
 from config import (
     directory_names,
     path_to_directories,
@@ -79,51 +79,24 @@ if __name__ == "__main__":
     ax.grid(True, which='both', axis='both')
 
     # Loop all files
-    for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
-        # Setup paths
-        full_directory_path = path_to_directories + dirname
-        full_file_path = full_directory_path + "forces.pkl"
+    for force_case in iter_force_cases(
+        directory_names=directory_names,
+        path_to_directories=path_to_directories,
+        forces_file_noext=forces_file_noext,
+        metric=metric,
+        ctu_skip=ctu_skip,
+        n_downsample=n_downsample,
+        ref_area=ref_area,
+        ctu_len=ctu_len,
+    ):
+        physTime = force_case.phys_time
+        signal = force_case.signal
 
-        # Check if file exists
-        if not os.path.exists(full_file_path):
-            print(f"File {full_file_path} does not exist. Skipping.")
-            continue
-
-        # Get time step size
-        # Note for James' data, we cannot detect 4e-6 from force file
-        # because the sampling rate is set to 4e-5
-        dt = get_time_step_size(full_directory_path)
-
-        # Get plot styling
-        label, marker, mfc, ls, color = get_label(full_file_path, dt, color=dir_color)
+        dt = force_case.metadata.dt
+        label = force_case.metadata.label
+        color = force_case.metadata.color
+        ls = force_case.metadata.linestyle
         print("\nProcessing {0}...".format(label))
-
-        # Read forces file
-        # df = pd.read_csv(full_file_path, sep=',')
-        df = pd.read_pickle(full_file_path)
-
-        # Select specific force output
-        df = df[forces_file_noext]
-
-        # Extract time and data
-        physTime = df["Time"]
-        physTime = physTime / ctu_len # Normalise to CTUs
-        signal = df[metric]
-
-        # check_sampling_rates(physTime, True)
-
-        # Build mask based on time interval
-        physTime, signal = filter_time_interval(physTime, signal, ctu_skip)
-
-        # Correct data (coeff = 2 * Force)
-        signal = 2 * signal
-
-        # Normalise by area
-        # Note quasi-3d is averaged along spanwise
-        if "quasi3d" in full_file_path:
-            signal = signal / ctu_len
-        else:
-            signal = signal / ref_area
 
         # Get raw sample frequency
         f_sample = max([
@@ -148,15 +121,6 @@ if __name__ == "__main__":
             f_sample = f_sample / n_downsample
             print(f"Downsampled sample frequency: {f_sample}")
             # label += f" downsample {n_downsample}"
-
-        # # Determine end of transient via mser
-        # mser_stride_length = 10 if dt < 5e-5 else 1
-        # intTransient = mser(signal, physTime, stride_length=mser_stride_length)
-        # timeTransient = physTime.iloc[intTransient]
-        # print("End of transient at time {0} CTU and index {1}".format(timeTransient, intTransient))
-        #
-        # # Remove end of transient from signal
-        # signal = signal.iloc[intTransient:]
 
         # Normalisation: remove mean
         # This should only affect the zero frequency (mean) mode

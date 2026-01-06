@@ -14,7 +14,8 @@ from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 import pandas as pd
 
-from utilities import get_time_step_size, mser, get_label, get_scheme, filter_time_interval
+from case_processing import iter_force_cases
+from utilities import mser, get_scheme
 from config import (
     directory_names,
     path_to_directories,
@@ -88,58 +89,22 @@ if __name__ == "__main__":
 
 
     # Loop all files
-    for dirname in directory_names:
-        # Setup paths
-        full_directory_path = path_to_directories + dirname
-        full_file_path = full_directory_path + "forces.pkl"
-
-        # Check if file exists
-        if not os.path.exists(full_file_path):
-            print(f"File {full_file_path} does not exist. Skipping.")
-            continue
-
-        # Create dictionary for gathering data
-        case_dict = {'scheme': get_scheme(full_file_path)}
-
-        # Get time step size
-        dt = get_time_step_size(full_directory_path)
-        case_dict['dt'] = dt
-
-        # Get plot styling
-        label, marker, mfc, ls, color = get_label(full_file_path, dt, raw_label=False)
+    for force_case in iter_force_cases(
+        directory_names=directory_names,
+        path_to_directories=path_to_directories,
+        forces_file_noext=forces_file_noext,
+        metric=metric,
+        ctu_skip=ctu_skip,
+        n_downsample=n_downsample,
+        ref_area=ref_area,
+        ctu_len=ctu_len,
+    ):
+        dt = force_case.metadata.dt
+        label = force_case.metadata.label
         print("\nProcessing {0}...".format(label))
 
-        # Read forces file
-        # df = pd.read_csv(full_file_path, sep=',')
-        df = pd.read_pickle(full_file_path)
-
-        # Select specific force output
-        df = df[forces_file_noext]
-
-        # Extract time and data
-        physTime = df["Time"]
-        physTime = physTime / ctu_len # Normalise to CTUs
-        signal = df[metric]
-
-        # Build mask based on time interval
-        physTime, signal = filter_time_interval(physTime, signal, ctu_skip)
-
-        # Correct data (coeff = 2 * Force)
-        signal = 2 * signal
-
-        # Normalise by area
-        # Note quasi-3d is averaged along spanwise
-        if "quasi3d" in full_file_path:
-            signal = signal / ctu_len
-        else:
-            signal = signal / ref_area
-
-        # Downsample
-        # Note: do this before MSER
-        if n_downsample > 1:
-            signal = signal[::n_downsample]
-            physTime = physTime[::n_downsample]
-            # label += f" downsample {n_downsample}"
+        signal = force_case.signal
+        physTime = force_case.phys_time
 
         # Determine end of transient via mser
         if use_mser:
@@ -163,8 +128,12 @@ if __name__ == "__main__":
             break
 
         # Add statistics to dict
-        case_dict[f'{metric}-mean'] = mean
-        case_dict[f'{metric}-std'] = std
+        case_dict = {
+            'scheme': get_scheme(force_case.metadata.file_path),
+            'dt': dt,
+            f'{metric}-mean': mean,
+            f'{metric}-std': std,
+        }
 
         # Transform to DataFrame and concatenate
         df_case = pd.DataFrame([case_dict])
