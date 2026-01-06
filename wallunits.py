@@ -11,16 +11,12 @@ import pandas as pd
 import os
 
 
-from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_region_to_mesh_map, ctu_len, kinvis, \
-    path_to_mesh, path_to_mesh_boundary, boundary_names_plot
+from config import directory_names, path_to_directories, save_directory, boundary_names, boundary_region_to_mesh_map, \
+    ctu_len, kinvis, \
+    path_to_mesh, path_to_mesh_boundary, boundary_names_plot, meshname, wallunits_ref_name
 from utilities import get_label
 
 
-
-ctuname = "ctu_20_30"
-filenames = [
-        "mean_fields_" + ctuname + "_avg_wallunits",
-        ]
 
 global_xlim = [-0.05, 1.7]
 savename = f"wallunits"
@@ -42,79 +38,85 @@ if __name__ == "__main__":
 
     for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
         # Setup paths
-        full_directory_path = path_to_directories + dirname
-        for filename in filenames:
-            file_path = full_directory_path + filename
-            label = get_label(file_path)
-            label = label[0] # ignore all other returns
+        # Note we assume this file is in the same directory as the mesh file
+        file_path = path_to_mesh.replace(f"{meshname}.xml", wallunits_ref_name).replace("wss", "wallunits")
+        label = get_label(file_path)
+        label = label[0] # ignore all other returns
 
-            # Loops all wing elements (boundaries)
-            xorigin = 0
-            for bname, b_color in zip(boundary_names, TABLEAU_COLORS):
-                # Get csv file for wss
-                boundary_file_path = file_path + "_" + bname
+        # Loops all wing elements (boundaries)
+        xorigin = 0
+        for bname, b_color in zip(boundary_names, TABLEAU_COLORS):
+            # Get csv file for wss
+            boundary_file_path = file_path + "_" + bname + ".csv"
 
-                # Read yplus
-                df = pd.read_csv(boundary_file_path, sep=' ')
-    
-                # Process x-coordinate
-                if "yplus" in boundary_file_path:
-                    x = df.iloc[:, 1].to_numpy()
-                else:
-                    x = df["x"].to_numpy()
-                x = x / ctu_len # scale with cord
-    
-                # Build case specific label
-                label = get_label(boundary_file_path)
-                label = label[0]
-    
-                variables = ["xplus", "yplus", "zplus"]
-                for ax, var in zip(axs, variables):
-                    wallunit = np.abs(df[var]) / 4
-                    ax.plot(x, wallunit, marker='o', linestyle='', markeredgewidth=1.0, color=b_color, label=boundary_names_plot[boundary_names.index(bname)], alpha=1.0)
+            # Read yplus
+            df = pd.read_csv(boundary_file_path, sep=' ')
+
+            # Process x-coordinate
+            if "yplus" in boundary_file_path:
+                x = df.iloc[:, 1].to_numpy()
+            else:
+                x = df["x"].to_numpy()
+            x = x / ctu_len # scale with cord
+
+            # Build case specific label
+            label = get_label(boundary_file_path)
+            label = label[0]
+
+            variables = ["xplus", "yplus", "zplus"]
+            for ax, var in zip(axs, variables):
+                # Note: divide by polynomial order P = 4 for average (equidistant) spacing of quad points!
+                wallunit = np.abs(df[var]) / 4
+                ax.plot(x, wallunit, marker='o', linestyle='', markeredgewidth=1.0, color=b_color, label=boundary_names_plot[boundary_names.index(bname)], alpha=1.0)
 
         for ax in axs:
             ax.set_xlabel("$x/c$")
             ax.set_yscale("log")
 
-            ax.set_xlim(global_xlim)
+            if global_xlim:
+                ax.set_xlim(global_xlim)
             xmin, xmax = ax.get_xlim()
             ymin, ymax = ax.get_ylim()
+            ymax = ymax
+            ymin = ymax / 1000
 
             # Plot limits based on Georgiadis et al. (2010)
             if ax == axs[0]:
                 ax.set_ylabel("$\Delta x^+$")
                 # Set x^+ = 50 limit bar
-                ax.plot([xmin, xmax], [150, 150], '-r')
-                ax.plot([xmin, xmax], [50, 50], '-r')
-                ax.text(xmax*0.65, 50*1.1, "$\Delta x^+ limit$")
-                ax.fill_between([xmin, xmax], y1=50, y2=150, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
-                ax.set_ylim([1e0, 3e2])
+                # ax.plot([xmin, xmax], [150, 150], '-r')
+                ax.plot([xmin, xmax], [50, 50], '-r', label="Georgiadis et al. (2010)")
+                ax.text(xmax*0.6, 50*1.1, "$\Delta x^+ limit <= 50$", fontweight='bold')
+                # ax.fill_between([xmin, xmax], y1=50, y2=150, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
+                # ax.set_ylim([1e0, 3e2])
+                ax.set_ylim([ymin, ymax*10])
 
                 # Hide xtick labels on all but the bottom-most axis
                 ax.tick_params(axis='x', which='both', labelbottom=False)
                 ax.set_xlabel("")
 
             elif ax == axs[1]:
-                ax.set_ylabel("$\Delta z^+$")
+                ax.set_ylabel("$\Delta y^+$")
                 # Set y^+ = 1 limit bar
-                ax.plot([xmin, xmax], [1, 1], '-r')
-                ax.text(xmax*0.65, 1/20, "$\Delta z^+ limit$")
-                ax.fill_between([xmin, xmax], y1=1*0.9, y2=1*1.1, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
-                ax.set_ylim([1e-5, 5e0])
+                ax.plot([xmin, xmax], [1, 1], '-r', label="Georgiadis et al. (2010)")
+                ax.text(xmax*0.6, 1.1 / 10, "$\Delta y^+ limit <= 1$", fontweight='bold')
+                # ax.fill_between([xmin, xmax], y1=1*0.9, y2=1*1.1, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
+                # ax.set_ylim([1e-5, 5e0])
+                ax.set_ylim([ymin / 10, 2])
 
                 # Hide xtick labels on all but the bottom-most axis
                 ax.tick_params(axis='x', which='both', labelbottom=False)
                 ax.set_xlabel("")
 
             elif ax == axs[2]:
-                ax.set_ylabel("$\Delta y^+$")
+                ax.set_ylabel("$\Delta z^+$")
                 # Set z^+ = 15 limit bar
-                ax.plot([xmin, xmax], [40, 40], '-r')
-                ax.plot([xmin, xmax], [15, 15], '-r')
-                ax.text(xmax*0.65, 5e0, "$\Delta y^+ limit$")
-                ax.fill_between([xmin, xmax], y1=15, y2=40, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
-                ax.set_ylim([5e-2, 1e2])
+                # ax.plot([xmin, xmax], [40, 40], '-r')
+                ax.plot([xmin, xmax], [15, 15], '-r', label="Georgiadis et al. (2010)")
+                ax.text(xmax*0.6, 20*1.1, "$\Delta z^+ limit <= 15$", fontweight='bold')
+                # ax.fill_between([xmin, xmax], y1=15, y2=40, alpha=0.2, label="Georgiadis et al. (2010)", color='red')#, color=color, marker=marker, linestyle='', capsize=5)
+                # ax.set_ylim([5e-2, 1e2])
+                ax.set_ylim([ymin, ymax * 2])
 
             #ax.set_ylim([1e-4, ymax])
             # Removed per-axis legend to avoid covering data
