@@ -1,111 +1,20 @@
 
-case = 'eifw'
-DEBUG = True
-use_cfl = False
-use_iterations = True
-scaling = True
-
-
-
-#### Capability runs ####
-if case == 'capability':
-
-    # Walk through directories and merge files
-    log_file_glob_str = 'log*'
-    force_file_glob_strs = [
-        'FWING_TOTAL_forces.fce',
-        # 'LFW_fia_mp_forces.fce',
-        # 'LFW_element_1_forces.fce',
-        # 'LFW_element_2_forces.fce',
-    ]
-    history_file_glob_strs = [
-        # 'mainplane_spanwise.his',
-        # 'mainplane_streamwise.his',
-        # "mainplane-suction-midplane.his",
-        # 'flap1_spanwise.his',
-        # 'flap1_streamwise.his',
-        # 'flap2_spanwise_pressure.his',
-        # 'flap2_spanwise_suction.his',
-        # 'flap2_streamwise.his',
-        # 'wake_0_15.his',
-        # 'wake_0_225.his',
-        # 'wake_0_35.his',
-        # 'wake_0_65.his',
-    ]
-
-    path_to_directories = "/home/henrik/Documents/simulation_data/capability/"
-    save_directory = "/home/henrik/Documents/simulation_data/capability/graphics/"
-    #
-    # path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + "/mesh/mesh.xml"
-    # # Order must follow boundary_names below
-    # path_to_mesh_boundary = [
-    #     path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
-    #     path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
-    #     path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
-    # ]
-
-    directory_names = [
-        # "eifw/semiimplicit/dt1e-5/",
-        "fifw/semiimplicit/dt5e-6/",
-        # "wifw/semiimplicit/dt1e-6/",
-        #
-        # "eifw/linearimplicit/dt1e-5/",
-        # "fifw/linearimplicit/dt5e-6/",
-        # "wifw/linearimplicit/dt1e-6/",
-        #
-        # "eifw/substepping/dt1e-5/",
-        # "fifw/substepping/dt5e-6/",
-        # "wifw/substepping/dt1e-6/",
-    ]
-
-    # Skip initial or final n points for each (individual/subdir!) force file
-    # Note that a small overlap removes the pressure kick after restarting
-    # We found that this improves PSDs
-    force_file_skip_start = 5
-    force_file_skip_end = 0
-
-    # case-specific definitions
-    ylabels = ["$C_d$", "$C_l$"]#, "$C_S$", "$C_L$"]
-    ynames = ["Drag", "Lift"]#, "Sheer", "Lift"]
-    customMetrics = ["F1-total", "F3-total"]#, "F2-total", "F3-total"]
-
-    # Characteristic velocity and lengths
-    ref_velocity = 1.0 # non-dimensional velocity [ms]
-    chord_length = 0.25 # mainplane chord [m]
-    ctu_len = chord_length / ref_velocity # [s]
-    spanlen_npp = 0.05 # spanwise length for extruded IFW [m]
-    ref_area = ctu_len * spanlen_npp # reference area
-    kinvis = 1.448e-6
-
-    # reference time step size (CFL ~= 1)
-    dtref = 1e-5
-
-    # divergence tolerance for detection
-    divtol = 1e3
-
-    # Boundary data naming:
-    boundary_names = [
-    ]
-
-    boundary_names_long = [
-    ]
-
-    boundary_names_long_map = {
-    }
-
-    boundary_names_plot = [
-    ]
-
-    boundary_region_to_mesh_map = {
-    }
+case = 'capability'
+DEBUG = False
+use_cfl = True
+use_iterations = False
+use_subint = False
+scaling = False
 
 
 
 #### CONFIG FOR 3D extruded IFW ####
-elif case == 'eifw':
+if case == 'eifw':
 
     # Walk through directories and merge files
-    log_file_glob_str = 'log*'
+    log_file_glob_strs = [
+        'log*'
+    ]
     force_file_glob_strs = [
         'FWING_TOTAL_forces.fce',
         'LFW_fia_mp_forces.fce',
@@ -113,14 +22,14 @@ elif case == 'eifw':
         'LFW_element_2_forces.fce',
     ]
     history_file_glob_strs = [
-        # 'mainplane_spanwise.his',
-        'mainplane_streamwise.his',
         "mainplane-suction-midplane.his",
-        # 'flap1_spanwise.his',
+        # 'mainplane_streamwise.his',
         # 'flap1_streamwise.his',
+        # 'flap2_streamwise.his',
+        # 'mainplane_spanwise.his',
+        # 'flap1_spanwise.his',
         # 'flap2_spanwise_pressure.his',
         # 'flap2_spanwise_suction.his',
-        # 'flap2_streamwise.his',
         # 'wake_0_15.his',
         # 'wake_0_225.his',
         # 'wake_0_35.his',
@@ -130,32 +39,40 @@ elif case == 'eifw':
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work/physics/archer2/"
     save_directory = "/home/henrik/Documents/simulation_data/cpc-figures/"
 
-    path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + "/mesh/mesh.xml"
+    meshname = "mesh"
+    path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + f"/mesh/{meshname}.xml"
     # Order must follow boundary_names below
     path_to_mesh_boundary = [
-        path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
-        path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
-        path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
+        path_to_mesh.replace(f"{meshname}.xml",f"{meshname}_b5.xml"),
+        path_to_mesh.replace(f"{meshname}.xml", f"{meshname}_b6.xml"),
+        path_to_mesh.replace(f"{meshname}.xml", f"{meshname}_b7.xml"),
     ]
 
     directory_names = [
         # "../../../../quasi3d/james/farringdon_data/",
+        # "semiimplicit/dt5e-6/",
         "semiimplicit/dt1e-5/",
+
         # "linearimplicit/dt1e-5/",
         # "linearimplicit/dt5e-5/",
         # "linearimplicit/dt1e-4/",
-        # "linearimplicit/dt2e-4/",
+        "linearimplicit/dt2e-4/",
         # "linearimplicit/dt5e-4/",
-        # "linearimplicit/dt1e-3/",
+        "linearimplicit/dt1e-3/",
+
         # "substepping/dt1e-5/",
         # "substepping/dt5e-5/",
         # "substepping/dt1e-4/",
-        # "substepping/dt2e-4/",
+        "substepping/dt2e-4/",
     ]
+
+    # Reference simulation for wallunits
+    # Note this is the semi-implicit with dt=1e-5
+    wallunits_ref_name = "mean_fields_ctu_306_386_avg_wss"
 
     # Skip initial or final n points for each (individual/subdir!) force file
     # Note that a small overlap removes the pressure kick after restarting
-    # We found that this improves PSDs
+    # We found that this shows proper high frequency range in PSDs
     force_file_skip_start = 5
     force_file_skip_end = 0
 
@@ -203,8 +120,8 @@ elif case == 'eifw':
 
     boundary_names_plot = [
         "Main plane",
-        "1st Flap",
-        "2nd Flap",
+        "Flap 1",
+        "Flap 2",
     ]
 
     boundary_region_to_mesh_map = {
@@ -214,11 +131,188 @@ elif case == 'eifw':
     }
 
 
+#### Capability runs ####
+elif case == 'capability':
+
+    # Walk through directories and merge files
+    log_file_glob_strs = [
+        'log*'
+    ]
+    force_file_glob_strs = [
+        'FWING_TOTAL_forces.fce',
+        # 'LFW_fia_mp_forces.fce',
+        # 'LFW_element_1_forces.fce',
+        # 'LFW_element_2_forces.fce',
+    ]
+    history_file_glob_strs = [
+        # 'mainplane_spanwise.his',
+        # 'mainplane_streamwise.his',
+        # "mainplane-suction-midplane.his",
+        # 'flap1_spanwise.his',
+        # 'flap1_streamwise.his',
+        # 'flap2_spanwise_pressure.his',
+        # 'flap2_spanwise_suction.his',
+        # 'flap2_streamwise.his',
+        # 'wake_0_15.his',
+        # 'wake_0_225.his',
+        # 'wake_0_35.his',
+        # 'wake_0_65.his',
+    ]
+
+    path_to_directories = "/home/henrik/Documents/simulation_data/capability/"
+    save_directory = "/home/henrik/Documents/simulation_data/capability/graphics/"
+    #
+    # path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + "/mesh/mesh.xml"
+    # # Order must follow boundary_names below
+    # path_to_mesh_boundary = [
+    #     path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
+    #     path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
+    #     path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
+    # ]
+
+    directory_names = [
+        # "eifw/semiimplicit/dt1e-5/",
+        "fifw/semiimplicit/dt5e-6/",
+        # "wifw/semiimplicit/dt1e-6/",
+    ]
+
+    # Skip initial or final n points for each (individual/subdir!) force file
+    # Note that a small overlap removes the pressure kick after restarting
+    # We found that this improves PSDs
+    force_file_skip_start = 5
+    force_file_skip_end = 0
+
+    # case-specific definitions
+    ylabels = ["$C_d$", "$C_l$"]#, "$C_S$", "$C_L$"]
+    ynames = ["Drag", "Lift"]#, "Sheer", "Lift"]
+    customMetrics = ["F1-total", "F3-total"]#, "F2-total", "F3-total"]
+
+    # Characteristic velocity and lengths
+    ref_velocity = 1.0 # non-dimensional velocity [ms]
+    chord_length = 0.25 # mainplane chord [m]
+    ctu_len = chord_length / ref_velocity # [s]
+    spanlen_npp = 0.05 # spanwise length for extruded IFW [m]
+    ref_area = ctu_len * spanlen_npp # reference area
+    kinvis = 1.448e-6
+
+    # reference time step size (CFL ~= 1)
+    dtref = 5e-6
+
+    # divergence tolerance for detection
+    divtol = 1e3
+
+    # Boundary data naming:
+    boundary_names = [
+    ]
+
+    boundary_names_long = [
+    ]
+
+    boundary_names_long_map = {
+    }
+
+    boundary_names_plot = [
+    ]
+
+    boundary_region_to_mesh_map = {
+    }
+
+
+#### Capability runs ####
+elif case == 'alexeifw':
+
+    # Walk through directories and merge files
+    log_file_glob_strs = [
+        '*.l*'
+    ]
+    force_file_glob_strs = [
+        'FWING_TOTAL_forces.fce',
+        # 'LFW_fia_mp_forces.fce',
+        # 'LFW_element_1_forces.fce',
+        # 'LFW_element_2_forces.fce',
+    ]
+    history_file_glob_strs = [
+        # 'mainplane_spanwise.his',
+        # 'mainplane_streamwise.his',
+        # "mainplane-suction-midplane.his",
+        # 'flap1_spanwise.his',
+        # 'flap1_streamwise.his',
+        # 'flap2_spanwise_pressure.his',
+        # 'flap2_spanwise_suction.his',
+        # 'flap2_streamwise.his',
+        # 'wake_0_15.his',
+        # 'wake_0_225.his',
+        # 'wake_0_35.his',
+        # 'wake_0_65.his',
+    ]
+
+    path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work/physics/alex-results/"
+    save_directory = "/home/henrik/Documents/simulation_data/cpc-figures/"
+    #
+    # path_to_mesh = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/3d/please-work" + "/mesh/mesh.xml"
+    # # Order must follow boundary_names below
+    # path_to_mesh_boundary = [
+    #     path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
+    #     path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
+    #     path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
+    # ]
+
+    directory_names = [
+        "semiimplicit/dt1e-5/",
+        "linearimplicit/dt1e-5/",
+        "substepping/dt1e-5/",
+    ]
+
+    # Skip initial or final n points for each (individual/subdir!) force file
+    # Note that a small overlap removes the pressure kick after restarting
+    # We found that this improves PSDs
+    force_file_skip_start = 5
+    force_file_skip_end = 0
+
+    # case-specific definitions
+    ylabels = ["$C_d$", "$C_l$"]#, "$C_S$", "$C_L$"]
+    ynames = ["Drag", "Lift"]#, "Sheer", "Lift"]
+    customMetrics = ["F1-total", "F3-total"]#, "F2-total", "F3-total"]
+
+    # Characteristic velocity and lengths
+    ref_velocity = 1.0 # non-dimensional velocity [ms]
+    chord_length = 0.25 # mainplane chord [m]
+    ctu_len = chord_length / ref_velocity # [s]
+    spanlen_npp = 0.05 # spanwise length for extruded IFW [m]
+    ref_area = ctu_len * spanlen_npp # reference area
+    kinvis = 1.448e-6
+
+    # reference time step size (CFL ~= 1)
+    dtref = 5e-6
+
+    # divergence tolerance for detection
+    divtol = 1e3
+
+    # Boundary data naming:
+    boundary_names = [
+    ]
+
+    boundary_names_long = [
+    ]
+
+    boundary_names_long_map = {
+    }
+
+    boundary_names_plot = [
+    ]
+
+    boundary_region_to_mesh_map = {
+    }
+
+
+
 #### CONFIG FOR 3D extruded IFW ####
 elif case == 'eifw-legacy':
 
     # Walk through directories and merge files
-    log_file_glob_str = 'log.*'
+    log_file_glob_strs = [
+        'log*'
+    ]
     force_file_glob_strs = [
         # 'FWING_TOTAL_forces.fce',
         # 'LFW_fia_mp_forces.fce',
@@ -233,22 +327,22 @@ elif case == 'eifw-legacy':
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/eifw/"
     save_directory = "/home/henrik/Documents/simulation_data/cpc-figures/"
 
-    path_to_mesh = path_to_directories + "mesh/mesh.xml"
+    path_to_mesh = path_to_directories + "3d/please-work/mesh/mesh.xml"
     # Order must follow boundary_names below
     path_to_mesh_boundary = [
-        path_to_directories + "mesh/mesh_b5.xml",
-        path_to_directories + "mesh/mesh_b6.xml",
-        path_to_directories + "mesh/mesh_b7.xml",
+        path_to_mesh.replace("mesh.xml","mesh_b5.xml"),
+        path_to_mesh.replace("mesh.xml","mesh_b6.xml"),
+        path_to_mesh.replace("mesh.xml", "mesh_b7.xml"),
     ]
 
     directory_names = [
         # "quasi3d/james/farringdon_data/",
-        # "3d/please-work/physics/semiimplicit/dt1e-5/",
+        "3d/please-work/physics/semiimplicit/dt1e-5/",
         # "3d/please-work/physics/semiimplicit/dt1e-5-kinvis/",
         # "3d/please-work/physics/semiimplicit/dt1e-5/animation_280_285/",
         # "3d/please-work/physics/linearimplicit/dt1e-5/",
         # "3d/please-work/physics/linearimplicit/dt5e-5/",
-        "3d/please-work/physics/linearimplicit/dt1e-4/",
+        # "3d/please-work/physics/linearimplicit/dt1e-4/",
         # "3d/please-work/physics/linearimplicit/dt2e-4/",
         # "3d/please-work/physics/linearimplicit/dt5e-4/",
         # "3d/please-work/physics/linearimplicit/dt1e-3/",
@@ -301,13 +395,118 @@ elif case == 'eifw-legacy':
         "2nd Flap",
     ]
 
-    boundary_map = {
+    boundary_region_to_mesh_map = {
         'b0' : 5,
         'b1' : 6,
         'b2' : 7,
     }
 
 
+#### Full IFW runs ####
+elif case == 'fifw':
+
+    # Walk through directories and merge files
+    log_file_glob_strs = [
+        'log*'
+    ]
+    force_file_glob_strs = [
+        'FWING_TOTAL_forces.fce',
+        # 'LFW_fia_mp_forces.fce',
+        # 'LFW_element_1_forces.fce',
+        # 'LFW_element_2_forces.fce',
+    ]
+    history_file_glob_strs = [
+        # 'mainplane_spanwise.his',
+        # 'mainplane_streamwise.his',
+        # "mainplane-suction-midplane.his",
+        # 'flap1_spanwise.his',
+        # 'flap1_streamwise.his',
+        # 'flap2_spanwise_pressure.his',
+        # 'flap2_spanwise_suction.his',
+        # 'flap2_streamwise.his',
+        # 'wake_0_15.his',
+        # 'wake_0_225.his',
+        # 'wake_0_35.his',
+        # 'wake_0_65.his',
+    ]
+
+    path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/fifw/"
+    save_directory = "/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/fifw/graphics/"
+
+    meshname = "rig"
+    path_to_mesh = f"/home/henrik/Documents/simulation_data/codeVerification/f1-ifw/fifw/mesh/{meshname}.xml"
+
+    # Order must follow boundary_names below
+    path_to_mesh_boundary = [
+        path_to_mesh.replace(f"{meshname}.xml",f"{meshname}_b5.xml"),
+        path_to_mesh.replace(f"{meshname}.xml", f"{meshname}_b6.xml"),
+        path_to_mesh.replace(f"{meshname}.xml", f"{meshname}_b7.xml"),
+    ]
+
+    directory_names = [
+        "semiimplicit/dt5e-6/",
+    ]
+
+    # Skip initial or final n points for each (individual/subdir!) force file
+    # Note that a small overlap removes the pressure kick after restarting
+    # We found that this improves PSDs
+    force_file_skip_start = 5
+    force_file_skip_end = 0
+
+    # case-specific definitions
+    ylabels = ["$C_d$", "$C_l$"]#, "$C_S$", "$C_L$"]
+    ynames = ["Drag", "Lift"]#, "Sheer", "Lift"]
+    customMetrics = ["F1-total", "F3-total"]#, "F2-total", "F3-total"]
+
+    # Characteristic velocity and lengths
+    ref_velocity = 1.0 # non-dimensional velocity [ms]
+    chord_length = 0.25 # mainplane chord [m]
+    ctu_len = chord_length / ref_velocity # [s]
+    spanlen_npp = 0.05 # spanwise length for extruded IFW [m]
+    ref_area = ctu_len * spanlen_npp # reference area
+    kinvis = 1.448e-6
+
+    # reference time step size (CFL ~= 1)
+    dtref = 5e-6
+
+    # divergence tolerance for detection
+    divtol = 1e3
+
+    # Boundary data naming:
+    boundary_names = [
+        "b0",
+        "b1",
+        "b2",
+        # "b4",
+    ]
+
+    boundary_names_long = [
+        "mainplane",
+        "flap1",
+        "flap2",
+        # "endplate",
+    ]
+
+    boundary_names_long_map = {
+        boundary_names[0] : boundary_names_long[0],
+        boundary_names[1] : boundary_names_long[1],
+        boundary_names[2] : boundary_names_long[2],
+        # boundary_names[3] : boundary_names_long[3],
+    }
+
+    boundary_names_plot = [
+        "Main plane",
+        "1st Flap",
+        "2nd Flap",
+        # "Endplate",
+    ]
+
+    boundary_region_to_mesh_map = {
+        boundary_names[0] : 0,
+        boundary_names[1] : 1,
+        boundary_names[2] : 2,
+        # boundary_names[3] : 4,
+    }
 
 
 
@@ -316,7 +515,7 @@ elif case == 'eifw-legacy':
 elif case == '2difw':
 
     # Walk through directories and merge files
-    log_file_glob_str = 'log*'
+    log_file_glob_strs = ['log*']
     force_file_glob_strs = [
         'FWING_TOTAL_forces.fce',
         'LFW_fia_mp_forces.fce',
@@ -374,8 +573,79 @@ elif case == '2difw':
 
 
 #### CONFIG FOR 2D cylinder ####
+elif case == '2dcyl-substep':
+    log_file_glob_strs = ['log*']
+    force_file_glob_strs = ['DragLift.fce']
+    history_file_glob_strs = []
+
+    path_to_directories = "/home/henrik/cases/codeVerification/cylinder/2d/computers-fluids-verification/"
+    save_directory = path_to_directories + "figures/"
+    directory_names = [
+        # "weaksemiimplicit/dt8e-4/",
+        # "weaksemiimplicit/dt1e-3/",
+        # "weaksemiimplicit/dt2e-3/",
+
+        # "semiimplicit/dt8e-4/",
+        "semiimplicit/dt1e-3/",
+        # "semiimplicit/dt2e-3/",
+
+        # "linearimplicit/dt8e-4/",
+        "linearimplicit/dt1e-3/",
+        "linearimplicit/dt2e-3/",
+        "linearimplicit/dt4e-3/",
+        "linearimplicit/dt8e-3/",
+        "linearimplicit/dt1e-2/",
+        "linearimplicit/dt2e-2/",
+        "linearimplicit/dt4e-2/",
+        "linearimplicit/dt8e-2/",
+
+        # "substepping/dt8e-4/",
+        "substepping/dt1e-3/",
+        "substepping/dt2e-3/",
+        "substepping/dt4e-3/",
+        "substepping/dt8e-3/",
+        "substepping/dt1e-2/",
+        "substepping/dt2e-2/",
+        "substepping/dt4e-2/",
+        # "substepping/dt8e-2/",
+    ]
+
+    # Skip initial or final n points for each (individual/subdir!) force file
+    # Note that a small overlap removes the pressure kick after restarting
+    # We found that this improves PSDs
+    force_file_skip_start = 5
+    force_file_skip_end = 0
+
+
+    # case-specific definitions
+    ylabels = ["$C_d$", "$C_l$"]
+    ynames = ["Drag", "Lift"]
+    customMetrics = ["F1-total", "F2-total"]
+
+    # Characteristic velocity and lengths
+    ref_velocity = 1.0 # non-dimensional velocity [m/s]
+    chord_length = 1.0 # cyinder diameter [m]
+    ctu_len = chord_length / ref_velocity # [s]
+    ref_area = ctu_len # reference area
+
+    # reference time step size (CFL ~= 1)
+    dtref = 1e-3
+
+    # divergence tolerance for detection
+    divtol = 1e3
+
+    # Boundary data naming:
+    # b0 : cylinder
+    boundary_names = [
+        "b0",
+    ]
+
+
+
+
+#### CONFIG FOR 2D cylinder ####
 elif case == '2dcyl':
-    log_file_glob_str = 'log*'
+    log_file_glob_strs = ['log*']
     force_file_glob_strs = ['DragLift.fce']
     history_file_glob_strs = []
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/cylinder/2d/hx1/physics/"
@@ -388,7 +658,7 @@ elif case == '2dcyl':
 
 #### CONFIG FOR minimal test ####
 elif case == 'minimal':
-    log_file_glob_str = 'log*'
+    log_file_glob_strs = ['log*']
     force_file_glob_strs = []
     history_file_glob_strs = []
     path_to_directories = "/home/henrik/Documents/simulation_data/"
@@ -400,7 +670,7 @@ elif case == 'minimal':
 
 # #### CONFIG FOR channel flow ####
 elif case == 'channel':
-    log_file_glob_str = 'log*'
+    log_file_glob_strs = ['log*']
     force_file_glob_strs = ['DragLift.fce']
     history_file_glob_strs = []
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/channel/physics/ret180/kmm-setup/"
@@ -464,7 +734,7 @@ elif case == 'channel':
 #### CONFIG FOR taylor-green vortex ####
 elif case == 'tgv':
 
-    log_file_glob_str = 'log*'
+    log_file_glob_strs = ['log*']
     force_file_glob_strs = []
     history_file_glob_strs = ['*.eny', 'box.his']
     path_to_directories = "/home/henrik/Documents/simulation_data/codeVerification/taylorgreenvortex/"

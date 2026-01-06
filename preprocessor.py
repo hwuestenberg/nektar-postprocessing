@@ -206,6 +206,11 @@ def parse_log_file(logfile):
     n_cfl_info = 2 # always prints max cfl estimate and corresponding element ID
     cfl_info =[[] for i in range(n_cfl_info)]
 
+    # List for Sub-integrationg
+    subint_pattern = r"Sub-integrating\s*using\s*(\d+)\s*steps\s*over\s*Dt\s*=\s*([\d.e+-]+)\s*\(SubStep\s*CFL=([\d.e+-]+)\)"
+    n_subint_info = 3
+    subint_info =[[] for i in range(n_subint_info)]
+
     with open(logfile, 'r') as f:
         # Loop over each line in the file
         for i, line in enumerate(f):
@@ -229,7 +234,6 @@ def parse_log_file(logfile):
 
             ## Process: "Steps: 1        Time: 7.00050e+00  CPU Time: 98.902s"
             if 'Steps:' in line and 'Time:' in line:
-                # Extract the fifth field from the space-separated line
                 fields = re.search(step_pattern, line.strip())
                 step_info[0].append(int(fields.group(1)))
                 step_info[1].append(float(fields.group(2)))
@@ -239,10 +243,16 @@ def parse_log_file(logfile):
             ## Process: "CFL: 8.30743e+01 (in elmt 26837)"
             if use_cfl:
                 if 'CFL:' in line and 'in elmt' in line:
-                    # Extract the fifth field from the space-separated line
                     fields = re.search(cfl_pattern, line.strip())
                     cfl_info[0].append(float(fields.group(1)))
                     cfl_info[1].append(int(fields.group(2)))
+
+            ## Process: "Sub-integrating using 3 steps over Dt = 1e-05 (SubStep CFL=0.5)"
+            if 'Sub-integrating' in line:
+                fields = re.search(subint_pattern, line.strip())
+                subint_info[0].append(float(fields.group(1)))
+                subint_info[1].append(float(fields.group(2)))
+                subint_info[2].append(float(fields.group(3)))
 
     # Adjust length for equal length lists
     if use_iterations and len(step_info[0]) != len(iter_info[0]):
@@ -274,6 +284,12 @@ def parse_log_file(logfile):
         # Add w only for 3D problems
         if num_variables == 4:
             data_dict['iterations_w'] = iter_info[3]
+
+    # Add subintegration info (only if any)
+    if len(subint_info[0]) > 0:
+        data_dict['substeps'] = subint_info[0]
+        data_dict['substep_dt'] = subint_info[1]
+        data_dict['substep_cfl'] = subint_info[2]
 
     # Convert to dataframe and return
     df_log = pd.DataFrame(data_dict)
@@ -312,7 +328,7 @@ def find_process_file(subdir, file_glob_str):
     files = glob(cdpath + file_glob_str)
     files = [l for l in files if not "log_info.pkl" in l]
 
-    assert(len(files) == 0, f"Error. Could not find any files using glob string: {file_glob_str} on path: {cdpath}")
+    # assert(len(files) == 0, f"Error. Could not find any files using glob string: {file_glob_str} on path: {cdpath}")
 
     # Choose process file as first or only file
     if len(files) > 1:
