@@ -1,5 +1,9 @@
+#!/bin/python3
+import os
+
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
+
 params = {'text.usetex': True,
  'font.size' : 10,
 }
@@ -10,7 +14,7 @@ from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 import pandas as pd
 
-from utilities import get_time_step_size, mser, get_label, get_scheme
+from utilities import get_time_step_size, mser, get_label, get_scheme, filter_time_interval
 from config import (
     directory_names,
     path_to_directories,
@@ -25,19 +29,27 @@ from config import (
 )
 
 
+############################
+####### SCRIPT USER INPUTS
+############################
 # Choose lift [1] or drag [0]
-metric = customMetrics[0]
-forces_file = force_file_glob_strs[0]
+metric = customMetrics[1]
 
-averaging_len = 30 # [CTU] redundant due to MSER, just use large number
+forces_file = force_file_glob_strs[0]
+forces_file_noext = forces_file.split('.')[0]
+# forces_file = "DragLift.fce"
+ctu_skip = 1e10 # sort of redundant with MSER
+use_mser = False
+
+averaging_len = 1000 # [CTU] redundant due to MSER, just use large number
 n_downsample = 2
 
-savename = f"mean-{metric}-{forces_file.split('.')[0]}"
+savename = f"mean-{metric}-{forces_file_noext}"
 savename = save_directory + savename
+############################
 
 
-
-xlim = [8e-6 / dtref, 8e-4 / dtref]
+xlim = [8e-6 / dtref, 1.2e-3 / dtref]
 ylim = []
 
 
@@ -58,12 +70,12 @@ if __name__ == "__main__":
         ylabel = r"$\overline{C}_d$"
     ax.set_ylabel(ylabel)
     # ax.set_xlabel(r"Time step increase $\Delta t_{CFL}$")
-    ax.set_xlabel(r"Time step increase $\times \Delta t$")
+    ax.set_xlabel(r"Time step increase $\times \Delta t_{CFL}$")
     # ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
     ax.set_xscale("log")
     ax.set_yscale("linear")
     ax.xaxis.set_major_formatter(FormatStrFormatter('%d'))
-    ax.grid(which='both', axis='both')
+    ax.grid(True, which='both', axis='both')
 
 
     # Dataframe for gathering statistics for each case
@@ -79,11 +91,12 @@ if __name__ == "__main__":
     for dirname in directory_names:
         # Setup paths
         full_directory_path = path_to_directories + dirname
+        full_file_path = full_directory_path + "forces.pkl"
 
-        # Add processed file name
-        filename = forces_file.replace(".fce", f"-process-overlap-{force_file_skip_start}.fce")
-
-        full_file_path = full_directory_path + filename
+        # Check if file exists
+        if not os.path.exists(full_file_path):
+            print(f"File {full_file_path} does not exist. Skipping.")
+            continue
 
         # Create dictionary for gathering data
         case_dict = {'scheme': get_scheme(full_file_path)}
@@ -93,74 +106,65 @@ if __name__ == "__main__":
         case_dict['dt'] = dt
 
         # Get plot styling
-        label, marker, mfc, ls, color = get_label(full_file_path, dt)
+        label, marker, mfc, ls, color = get_label(full_file_path, dt, raw_label=False)
         print("\nProcessing {0}...".format(label))
 
-        # Read file
-        df = pd.read_csv(full_file_path, sep=',')
+        # Read forces file
+        # df = pd.read_csv(full_file_path, sep=',')
+        df = pd.read_pickle(full_file_path)
+
+        # Select specific force output
+        df = df[forces_file_noext]
 
         # Extract time and data
         physTime = df["Time"]
         physTime = physTime / ctu_len # Normalise to CTUs
+        signal = df[metric]
 
         # Build mask based on time interval
-        tmax = physTime.max()
-        lowerMask = physTime >= tmax - averaging_len
-        upperMask = physTime <= tmax
-        mask = (lowerMask == 1) & (upperMask == 1)
-        if not np.any(mask):
-            print("No data for interval = [{0}, {1}]".format(tmax - averaging_len, tmax))
-            continue
-
-        # Extract signal
-        metricData = df[metric]
-
-        # Reduce using time-interval mask
-        metricData = metricData[mask]
+        physTime, signal = filter_time_interval(physTime, signal, ctu_skip)
 
         # Correct data (coeff = 2 * Force)
-        metricData = 2 * metricData
+        signal = 2 * signal
 
         # Normalise by area
         # Note quasi-3d is averaged along spanwise
         if "quasi3d" in full_file_path:
-            metricData = metricData / ctu_len
+            signal = signal / ctu_len
         else:
-            metricData = metricData / ref_area
+            signal = signal / ref_area
 
         # Downsample
         # Note: do this before MSER
         if n_downsample > 1:
-            metricData = metricData[::n_downsample]
+            signal = signal[::n_downsample]
             physTime = physTime[::n_downsample]
+            # label += f" downsample {n_downsample}"
 
         # Determine end of transient via mser
-        mser_stride_length = 10 if dt < 5e-5 else 1
-        intTransient = mser(metricData, physTime, stride_length=mser_stride_length)
-        timeTransient = physTime.iloc[intTransient]
-        print("End of transient at time {0} CTU and index {1}".format(timeTransient, intTransient))
+        if use_mser:
+            mser_stride_length = 10 if dt < 5e-5 else 1
+            intTransient = mser(signal, physTime, debug_plot = False, stride_length=mser_stride_length)
+            timeTransient = physTime.iloc[intTransient]
+            print("End of transient at time {0} CTU and index {1}".format(timeTransient, intTransient))
 
-        # Remove end of transient from signal
-        metricData = metricData.iloc[intTransient:]
+        # # Remove end of transient from signal
+        # signal = signal.iloc[intTransient:]
 
         # Do statistics
-        mean = metricData.mean()
-        std = metricData.std()
+        mean = signal.mean()
+        # mean = np.sqrt(np.pow(signal, 2).sum() / len(signal)) # compute RMS (lift for cylinder case)
+        std = signal.std()
         cv = std/mean
 
         # Ignore if diverged
-        if np.abs(metricData.iloc[-1]) > divtol or np.abs(mean) > divtol:
-            print("Last datapoint = {0:.1e} or mean = {1:.1e} is larger than {2:.1e}. Assuming divergence and skipping.".format(np.abs(metricData.iloc[-1]), np.abs(mean), divtol))
+        if np.abs(signal.iloc[-1]) > divtol or np.abs(mean) > divtol:
+            print("Last datapoint = {0:.1e} or mean = {1:.1e} is larger than {2:.1e}. Assuming divergence and skipping.".format(np.abs(signal.iloc[-1]), np.abs(mean), divtol))
             break
 
-        # # Verbose statistics
-        # print("Mean = {0}".format(mean))
-        # print("Std  = {0}".format(std))
-        # print("CV   = {0}\n".format(cv))
-
         # Add statistics to dict
-        case_dict[f'{metric}-mean'] = metricData.mean()
-        case_dict[f'{metric}-std'] = metricData.std()
+        case_dict[f'{metric}-mean'] = mean
+        case_dict[f'{metric}-std'] = std
 
         # Transform to DataFrame and concatenate
         df_case = pd.DataFrame([case_dict])
@@ -183,7 +187,15 @@ if __name__ == "__main__":
     #     ax.fill_between(dt_max_min, y1=df_plot[f'{metric}-mean']*1.01, y2=df_plot[f'{metric}-mean']*0.99,
     #                     alpha=0.2, label=rf"+/- 1\% error", color=list(TABLEAU_COLORS)[0])
 
-    ax.legend(loc='best')
+    # ax.legend(loc='best')
+    # Move the legend above the plot
+    ax.legend(
+        loc='lower center',  # position legend at the bottom center of the bbox
+        bbox_to_anchor=(0.5, 1.02),  # 0.5 = center horizontally, 1.02 = slightly above the axes
+        ncol=2,  # number of columns (optional)
+        frameon=True  # remove the box (optional)
+    )
+    # plt.tight_layout()  # adjust layout to fit legend
 
     ## Aesthetics
     # Set x/y-limits
