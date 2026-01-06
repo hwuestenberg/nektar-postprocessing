@@ -7,14 +7,15 @@ import matplotlib.pyplot as plt
 params = {'text.usetex': True,
  'font.size' : 10,
 }
-plt.rcParams.update(params) 
+plt.rcParams.update(params)
 from matplotlib.colors import TABLEAU_COLORS
 
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 
-from utilities import get_time_step_size, get_label, mser, plot_cumulative_mean_std, filter_time_interval
+from case_processing import iter_force_cases
+from utilities import mser
 from config import (
     directory_names,
     path_to_directories,
@@ -69,59 +70,23 @@ if __name__ == "__main__":
     ax.grid(True, which='both', axis='both')
 
     # Loop all files
-    for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
-        # Setup paths
-        full_directory_path = path_to_directories + dirname
-        full_file_path = full_directory_path + "forces.pkl"
+    for force_case in iter_force_cases(
+        directory_names=directory_names,
+        path_to_directories=path_to_directories,
+        forces_file_noext=forces_file_noext,
+        metric=metric,
+        ctu_skip=ctu_skip,
+        n_downsample=n_downsample,
+        ref_area=ref_area,
+        ctu_len=ctu_len,
+    ):
+        physTime = force_case.phys_time
+        signal = force_case.signal
 
-        # Check if file exists
-        if not os.path.exists(full_file_path):
-            print(f"File {full_file_path} does not exist. Skipping.")
-            continue
-
-        # Get time step size
-        # Note that we cannot detect 4e-6 from force file
-        # because the sampling rate is set to 4e-5
-        if "quasi3d" in full_directory_path:
-            dt = 4e-6
-        else:
-            dt = get_time_step_size(full_directory_path)
-
-        # Get plot styling
-        label, marker, mfc, ls, color = get_label(full_file_path, dt, raw_label=False)
+        dt = force_case.metadata.dt
+        label = force_case.metadata.label
+        color = force_case.metadata.color
         print("\nProcessing {0}...".format(label))
-
-        # Read forces file
-        # df = pd.read_csv(full_file_path, sep=',')
-        df = pd.read_pickle(full_file_path)
-
-        # Select specific force output
-        df = df[forces_file_noext]
-
-        # Extract time and data
-        physTime = df["Time"]
-        physTime = physTime / ctu_len # Normalise to CTUs
-        signal = df[metric]
-
-        # Build mask based on time interval
-        physTime, signal = filter_time_interval(physTime, signal, ctu_skip)
-
-        # Correct data (coeff = 2 * Force)
-        signal = 2 * signal
-
-        # Normalise by area
-        # Note quasi-3d is averaged along spanwise
-        if "quasi3d" in full_file_path:
-            signal = signal / ctu_len
-        else:
-            signal = signal / ref_area
-
-        # Downsample
-        # Note: do this before MSER
-        if n_downsample > 1:
-            signal = signal[::n_downsample]
-            physTime = physTime[::n_downsample]
-            # label += f" downsample {n_downsample}"
 
         # Determine end of transient via mser
         if use_mser:
@@ -139,7 +104,13 @@ if __name__ == "__main__":
 
         # Plot
         ax.plot(physTime, signal, color=color, alpha=0.3, label=label)
-        ax.plot([physTime.iloc[0], physTime.iloc[-1]], [signal.mean() for i in range(2)], color=dir_color, alpha=1.0, label="Mean " + label)
+        ax.plot(
+            [physTime.iloc[0], physTime.iloc[-1]],
+            [signal.mean() for i in range(2)],
+            color=color,
+            alpha=1.0,
+            label="Mean " + label,
+        )
 
         # # # Uncomment to plot reverse cumulative mean and std
         # plot_cumulative_mean_std(signal, physTime, ax, color=dir_color, label=label)
