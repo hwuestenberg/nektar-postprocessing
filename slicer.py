@@ -113,7 +113,9 @@ def set_spanwiseAverage():
             "active": True,
             "variables": ["u", "v", "w", "p"],
             "equispaced": True,
-            "distance": 0.0025,  # in m,
+            "distance": 0.0025,  # in m, 20 slices
+            # "distance": 0.01,  # in m, 5 slices
+            # "distance": 0.02,  # in m, 2 slices
             "origin": [],
         },
         "z": {
