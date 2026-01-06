@@ -1,4 +1,5 @@
 #!/bin/python3
+import os
 
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
@@ -34,9 +35,8 @@ metric = customMetrics[1]
 
 forces_file = force_file_glob_strs[0]
 forces_file_noext = forces_file.split('.')[0]
-# forces_file = "DragLift.fce"
-ctu_skip = 100 # sort of redundant with MSER
-use_mser = True
+ctu_skip = 1e10 # sort of redundant with MSER
+use_mser = False
 
 n_downsample = 2
 
@@ -50,7 +50,6 @@ savename = save_directory + savename
 
 # Verbose prints
 print("Using forces_file:", forces_file)
-print("Skipping {0} CTUs from the start".format(ctu_skip))
 
 
 
@@ -63,7 +62,7 @@ if __name__ == "__main__":
     if metric == customMetrics[0]:
         ylabel = r"$C_d$"
     ax.set_ylabel(ylabel)
-    ax.set_xlabel(r"$t^\star$")
+    ax.set_xlabel(r"CTU")
     ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
     ax.set_xscale("linear")
     ax.set_yscale("linear")
@@ -140,19 +139,19 @@ if __name__ == "__main__":
 
         # Plot
         ax.plot(physTime, signal, color=color, alpha=0.3, label=label)
-        # ax.plot([physTime.iloc[0], physTime.iloc[-1]], [signal.mean() for i in range(2)], color=dir_color, alpha=1.0, label="Mean " + label)
+        ax.plot([physTime.iloc[0], physTime.iloc[-1]], [signal.mean() for i in range(2)], color=dir_color, alpha=1.0, label="Mean " + label)
 
-        # # Uncomment to plot reverse cumulative mean and std
-        # plot_cumulative_mean_std(signal, physTime, ax, dir_color, label)
-
-        # Add averaging/mean
-        stepsPerCtu = ctu_len / dt
-        filter_width=int(len(signal)/50)
-
-        ## Savitzky-golay filter
-        metric_smooth = savgol_filter(signal, window_length=filter_width, polyorder=1, mode="interp")
-        #ax.plot(physTime[filter_width:-filter_width], metric_smooth[filter_width:-filter_width], color='black', linestyle='dotted', alpha=0.8)
-        ax.plot(physTime[filter_width:-filter_width], metric_smooth[filter_width:-filter_width], color=color, linestyle='solid', alpha=1.0)#, label='Moving average')
+        # # # Uncomment to plot reverse cumulative mean and std
+        # plot_cumulative_mean_std(signal, physTime, ax, color=dir_color, label=label)
+        #
+        # # Add averaging/mean
+        # stepsPerCtu = ctu_len / dt
+        # filter_width=int(len(signal)/50)
+        #
+        # ## Savitzky-golay filter
+        # metric_smooth = savgol_filter(signal, window_length=filter_width, polyorder=1, mode="interp")
+        # #ax.plot(physTime[filter_width:-filter_width], metric_smooth[filter_width:-filter_width], color='black', linestyle='dotted', alpha=0.8)
+        # ax.plot(physTime[filter_width:-filter_width], metric_smooth[filter_width:-filter_width], color=color, linestyle='solid', alpha=1.0)#, label='Moving average')
 
         # Handle legend outside
         handles, labels = ax.get_legend_handles_labels()

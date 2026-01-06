@@ -18,10 +18,10 @@ from config import directory_names, path_to_directories, ref_area, ctu_len, save
 
 ####### SCRIPT USER INPUTS
 # Choose lift [1] or drag [0]
-metric = 'cpu_time'
+metric = 'cfl'
 
 log_file = "log_info.pkl"
-signal_len_from_end = 30.0 # in CTUs
+signal_len_from_end = 40.0 # in CTUs
 use_mser = False
 
 n_downsample = 1
@@ -108,19 +108,6 @@ if __name__ == "__main__":
         mean = signal.mean()
         ax.plot([physTime.iloc[0], physTime.iloc[-1]], [signal.mean() for i in range(2)], color=dir_color,
                 alpha=1.0)  # , label="Mean " + label)
-
-        # Add text for mean
-        horizontal_offset = 0.75
-        vertical_offset = 1.4
-        if "linear-implicit" in full_directory_path:
-            vertical_offset = 1.4
-        if "substepping" in full_directory_path:
-            vertical_offset = 1.4
-            horizontal_offset = 0.6
-        ax.text(physTime.iloc[-1] * horizontal_offset, signal.mean() + np.log(vertical_offset), f"mean = {mean:.2f}", color=dir_color)
-
-
-
 
         # # Uncomment to plot reverse cumulative mean and std
         # plot_cumulative_mean_std(signal, physTime, ax, dir_color, label)
