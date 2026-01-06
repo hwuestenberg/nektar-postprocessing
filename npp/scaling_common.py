@@ -102,6 +102,9 @@ def read_timer_output(
                 line = line.replace(old, new)
             buffer.write(line)
 
+    # Reset file pointer to start of buffer before read_csv
+    buffer.seek(0)
+
     df_func = pd.read_csv(buffer, names=timer_columns, sep="\s+|\t+|\s+\t+|\t+\s+", engine="python")
     df_func = df_func.dropna(axis=1)
     df_func.columns = timer_columns
