@@ -27,8 +27,9 @@ The repository includes a variety of stand‑alone scripts that operate on the f
 - `history-psd.py` – compute power spectral densities of history point data or spatial FFTs of field data.
 - `log_info_plot.py` – plot variables such as CFL or iteration counts versus time from `log_info.csv`.
 - `psd.py` – compute PSDs of drag and lift coefficients using Welch’s method or a direct FFT.
-- `scaling.py` – strong-scaling analysis with speed‑up and parallel efficiency from `log_info.csv`.
-- `scaling-by-function.py` – timing‑by‑function scaling analysis using raw log output.
+- `scaling/scaling.py` – strong-scaling analysis with speed‑up and parallel efficiency from `log_info.csv`.
+- `scaling/scaling-by-function.py` – timing‑by‑function scaling analysis using raw log output.
+- Additional scaling utilities live in `scaling/` and share helpers from `npp.scaling_common`.
 - `slicer.py` – ParaView batch script to extract slices from `.vtu`/`.pvtu` files and write CSV/VTP.
 - `surface.py` – plot surface pressure or skin‑friction distributions for different averaging intervals.
 - `surface-span-avg.py` – compute spanwise‑averaged surface quantities using alphashape interpolation.
