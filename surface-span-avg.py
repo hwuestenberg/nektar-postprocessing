@@ -3,10 +3,6 @@
 import os, glob, subprocess
 import pickle
 
-import sys
-sys.path.insert(0, "/home/henrik/code/nektar-animation/build-master/python")
-from NekPy.FieldUtils import *
-
 # Matplotlib setup with latex
 import matplotlib.pyplot as plt
 params = {'text.usetex': True,
@@ -25,7 +21,7 @@ from utilities import get_time_step_size, get_label, get_ctu_names, extract_boun
 from config import directory_names, path_to_directories, ctu_len, boundary_names, save_directory, path_to_mesh_boundary, \
     boundary_names_long, boundary_names_long_map
 
-surf_variable = 'cf'
+surf_variable = 'cp'
 wss_variable = 'Shear_mag'
 
 ## plot only part of the surfaces
@@ -34,8 +30,8 @@ boundary_names_skip = list()
 # boundary_names_skip = boundary_names[1:]
 
 
-savename = f"surface-james-{surf_variable}"
-# savename = f"surface-scheme-{surf_variable}"
+# savename = f"surface-james-{surf_variable}"
+savename = f"surface-scheme-{surf_variable}"
 # savename = f"surface-dt-{surf_variable}"
 savename = save_directory + savename
 
@@ -51,19 +47,7 @@ if surf_variable == "cf":
 
 path_to_session = path_to_directories + directory_names[0] + "means/session.xml"
 
-# FieldConvert calls
-def convert_bnd_fld_to_vtu(f):
-    bid = extract_boundary_id(f)
-
-    field = Field(sys.argv, force_output=True)
-    InputModule.Create("xml", field, path_to_mesh_boundary[bid]).Run()
-    # InputModule.Create("xml", field, path_to_session).Run()
-    InputModule.Create("fld", field, f).Run()
-    OutputModule.Create("vtu", field, f.replace(".fld", ".vtu")).Run()
-
-
-
-# Build concave hull of the original geometry 
+# Build concave hull of the original geometry
 # and sample equispaced points on the geometry
 def getSampleCoordinatesOnGeometry(x_slice_coords, z_slice_coords):
     # Get xz coordinates in shape required for alphashapes
@@ -127,6 +111,35 @@ def create_slices(full_file_path):
     return slicenames, x_slice_coords, z_slice_coords
 
 
+def d_on_reference_via_griddata(x, y, d, x_ref, y_ref,
+                                method_linear='linear',
+                                fill_with_nearest=True):
+    """
+    Interpolate d(x,y) from scattered (x,y,d) and sample it at (x_ref,y_ref).
+
+    Returns
+    -------
+    d_ref : (M,) interpolated values on the reference curve
+    d_ref_src : (M,) where values came from: 'linear' or 'nearest' (if filled)
+    """
+    pts = np.column_stack([x, y])
+    xi  = np.column_stack([x_ref, y_ref])
+
+    # 1) Linear interpolation inside the convex hull
+    d_ref = griddata(pts, d, xi, method=method_linear)
+
+    # 2) Optionally fill NaNs (outside the hull) with nearest-neighbor
+    # src = np.full_like(x_ref, 'linear', dtype=object)
+    if fill_with_nearest and np.any(np.isnan(d_ref)):
+        dn = griddata(pts, d, xi, method='nearest')
+        mask = np.isnan(d_ref)
+        d_ref[mask] = dn[mask]
+        # src[mask] = 'nearest'
+
+    # return d_ref, src
+    return d_ref
+
+
 def interpolate_and_average_slices(slicenames, ref_slice_x, ref_slice_z):
     # Process all slices and compute mean at interpolated coordinate
     sq_mean = 0
@@ -161,7 +174,15 @@ def interpolate_and_average_slices(slicenames, ref_slice_x, ref_slice_z):
         # Method = 'Nearest' gives the best result
         # that is one point for each input coordinate
         # linear and cubic would only give a few points on suction side (interpolation error?)
-        sq_interp = griddata((x_coords, z_coords), sq, (ref_slice_x, ref_slice_z), method='nearest')
+        # sq_interp = griddata((x_coords, z_coords), sq, (ref_slice_x, ref_slice_z), method='nearest')
+
+        sq_interp = d_on_reference_via_griddata(x_coords, z_coords, sq, ref_slice_x, ref_slice_z,
+                                                method_linear='linear',
+                                                fill_with_nearest=True)
+
+        # ax.plot(ref_slice_x, sq_interp, label='interp' + sname.split("/")[-1], marker='x', color='black', linestyle='')
+
+        # ax.plot(x_coords, z_coords, label=sname.split("/")[-1], marker='o', linestyle='')
 
         sq_mean += sq_interp
 
@@ -216,8 +237,11 @@ if __name__ == "__main__":
                 if "quasi3d" in dirname:
                     filename = f"{surf_variable.upper()}/mean_fields_" + ctuname + "_avg_" + var_extension + bname + ".csv"
                 full_file_path = full_directory_path + filename
-                if not "quasi3d" in dirname:
-                    convert_bnd_fld_to_vtu(full_file_path.replace(".vtu", ".fld"))
+
+                # Convert via NekPy, TODO this currently introduces NaN into data
+                # if not "quasi3d" in dirname:
+                    # convert_bnd_fld(full_file_path.replace(".vtu", ".fld"), "vtu")
+                    # convert_bnd_fld(full_file_path.replace(".vtu", ".fld"), "csv")
 
                 if not os.path.exists(full_file_path):
                     print("Did not find {0}".format(full_file_path))
@@ -231,9 +255,9 @@ if __name__ == "__main__":
                 else:
                     slicenames, x_slice_coords, z_slice_coords = create_slices(full_file_path)
 
-                    ## Create reference slice using concave hull and save in pickle
+                    # ## Create reference slice using concave hull and save in pickle
                     # Sample x and z points on the geometry
-                    # sampled_x, sampled_z = getSampleCoordinatesOnGeometry(x_slice_coords, z_slice_coords)
+                    # ref_slice_x, ref_slice_z = getSampleCoordinatesOnGeometry(x_slice_coords, z_slice_coords)
                     # Write to pickle
                     # with open(f'./reference_slice_{bname}.pkl', 'wb') as file:
                     #     pickle.dump([sampled_x, sampled_z], file)
@@ -245,6 +269,9 @@ if __name__ == "__main__":
 
                     x = np.array(ref_slice_x)
                     sq = interpolate_and_average_slices(slicenames, ref_slice_x, ref_slice_z)
+
+                # plt.show()
+                # exit()
 
                 # Shift x to zero, only done for boundary_names[0]
                 if xorigin == 0:
