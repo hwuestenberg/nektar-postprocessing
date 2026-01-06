@@ -31,7 +31,8 @@ from config import (
 metric = customMetrics[1]
 
 forces_file = force_file_glob_strs[0]
-averaging_len = 100 # [CTU] redundant due to MSER, just use large number
+forces_file_noext = forces_file.split('.')[0]
+ctu_skip = 1e10 # sort of redundant with MSER
 
 n_downsample = 2
 f_target = None#12500  # Downsample to target sample rate for all cases
@@ -44,12 +45,12 @@ use_welch = True
 overlap = 2
 windows = 8
 
-xlim = [5e-1, 2e3]
-ylim = [1e-4, 1e4]
+xlim = [1e0, 2e3]
+ylim = [1e-1, 1e4]
 
-# savename = f"PSD-dt-{metric}-{forces_file.split('.')[0]}"
-# savename = f"PSD-scheme-{metric}-{forces_file.split('.')[0]}"
-savename = f"PSD-james-{metric}-{forces_file.split('.')[0]}"
+savename = f"psd-dt-{metric}-{forces_file.split('.')[0]}"
+# savename = f"psd-scheme-{metric}-{forces_file.split('.')[0]}"
+# savename = f"psd-james-{metric}-{forces_file.split('.')[0]}"
 savename = save_directory + savename
 
 
@@ -57,15 +58,13 @@ savename = save_directory + savename
 
 # Verbose prints
 print("Using forces_file:", forces_file)
-# print("Averaging over {0} CTUs".format(averaging_len))
-
 
 
 
 if __name__ == "__main__":
 
     # Create figure and axis
-    fig = plt.figure(figsize=(7,2))
+    fig = plt.figure(figsize=(4,2))
     ax = fig.add_subplot(111)
     ylabel = r"PSD($C_l$)"
     if metric == customMetrics[0]:
@@ -77,14 +76,18 @@ if __name__ == "__main__":
     ax.ticklabel_format(style='sci',axis='y', scilimits=(0,0), useMathText=True)
     ax.set_xscale("log")
     ax.set_yscale("log")
+    ax.grid(True, which='both', axis='both')
 
     # Loop all files
     for dirname, dir_color in zip(directory_names, TABLEAU_COLORS):
         # Setup paths
         full_directory_path = path_to_directories + dirname
-        _, file_extension = os.path.splitext(forces_file)
-        filename = forces_file.replace(f"{file_extension}", f"-process-overlap-{force_file_skip_start}{file_extension}")
-        full_file_path = full_directory_path + filename
+        full_file_path = full_directory_path + "forces.pkl"
+
+        # Check if file exists
+        if not os.path.exists(full_file_path):
+            print(f"File {full_file_path} does not exist. Skipping.")
+            continue
 
         # Get time step size
         # Note for James' data, we cannot detect 4e-6 from force file
@@ -95,8 +98,12 @@ if __name__ == "__main__":
         label, marker, mfc, ls, color = get_label(full_file_path, dt, color=dir_color)
         print("\nProcessing {0}...".format(label))
 
-        # Read file
-        df = pd.read_csv(full_file_path, sep=',')
+        # Read forces file
+        # df = pd.read_csv(full_file_path, sep=',')
+        df = pd.read_pickle(full_file_path)
+
+        # Select specific force output
+        df = df[forces_file_noext]
 
         # Extract time and data
         physTime = df["Time"]
@@ -106,7 +113,7 @@ if __name__ == "__main__":
         # check_sampling_rates(physTime, True)
 
         # Build mask based on time interval
-        physTime, signal = filter_time_interval(physTime, signal, averaging_len)
+        physTime, signal = filter_time_interval(physTime, signal, ctu_skip)
 
         # Correct data (coeff = 2 * Force)
         signal = 2 * signal
@@ -160,6 +167,7 @@ if __name__ == "__main__":
         # Note outputs PSD directly
         if use_welch:
             nperseg = round(float(signal.shape[0]) / windows)  # Dividing the length of the sample
+            print(f"nperseg = {nperseg}")
             freq_welch, psd_welch = welch(signal, fs=f_sample, nperseg=nperseg)#, noverlap=overlap)
             # label = "Welch " + label
             ax.plot(freq_welch, psd_welch / psd_welch[0], label=label, linestyle=ls, color=color)
@@ -193,14 +201,22 @@ if __name__ == "__main__":
     # ax.plot(xlim, points, label='Reference -30/3', linestyle='dotted', color='black')
 
     # Print reference frequencies
+    i = -5 # for spacing
     for st in ref_freq:
         ax.plot([st, st], ylim, linestyle='dashed', color='blue', alpha=0.3)
-        ax.text(st, ylim[0]*10, str(st))
+        ax.text(st + i, ylim[0]*2, str(st))
+        i = i + 5
 
     # Handle legend outside
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(loc='best')
-    ax.grid(True, which='both', axis='both')
+    # ax.legend(loc='best')
+
+    ax.legend(
+        loc='lower center',  # position legend at the bottom center of the bbox
+        bbox_to_anchor=(0.5, 1.02),  # 0.5 = center horizontally, 1.02 = slightly above the axes
+        ncol=2,  # number of columns (optional)
+        frameon=True  # remove the box (optional)
+    )
 
     fig.savefig(savename + ".pdf", bbox_inches="tight")
     print(f"Wrote file {savename} as pdf")
